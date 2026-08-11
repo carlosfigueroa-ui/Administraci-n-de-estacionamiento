@@ -1,0 +1,1487 @@
+
+                        <!DOCTYPE html>
+                        <html lang="en">
+                        <head>
+                            <meta charset="UTF-8">
+                            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+							<style>
+								body {
+									background-color: white; /* Ensure the iframe has a white background */
+								}
+
+								
+							</style>
+                        </head>
+                        <body>
+                            <!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Carpool - Coppel</title>
+    <!-- Tailwind y FontAwesome -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- LIBRERÍA PARA LEER EXCEL (SheetJS) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: { colors: { coppel: { blue: '#00549F', yellow: '#FFD100' } } }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: white; }
+        input::-webkit-calendar-picker-indicator { display: none !important; }
+        .scrollbar-custom::-webkit-scrollbar { width: 8px; height: 8px; }
+        .scrollbar-custom::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        .scrollbar-custom::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+        .scrollbar-custom::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+        input:checked ~ .toggle-bg { background-color: #00549F; }
+        input:checked ~ .toggle-dot { transform: translateX(100%); }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen font-sans">
+    <!-- Encabezado -->
+    <header class="bg-coppel-blue text-white shadow-md">
+        <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <h1 class="text-2xl font-bold hidden md:block"><i class="fas fa-car-side mr-2"></i> Gestión de Estacionamiento - Carpool</h1>
+            <h1 class="text-xl font-bold md:hidden"><i class="fas fa-car-side"></i> Carpool</h1>
+            
+            <!-- Botones de Respaldo y Restauración -->
+            <div class="flex items-center gap-2">
+                <input type="file" id="input-restaurar-bd" accept=".json" class="hidden" onchange="procesarRestauracionBD(event)">
+                <button onclick="document.getElementById('input-restaurar-bd').click()" class="bg-blue-700 hover:bg-blue-800 border border-blue-400 text-white px-3 py-1.5 rounded shadow transition flex items-center text-xs font-bold" title="Cargar archivo JSON">
+                    <i class="fas fa-upload mr-1.5"></i> <span class="hidden md:inline">Restaurar</span>
+                </button>
+                <button onclick="descargarRespaldoJSON()" class="bg-blue-800 hover:bg-blue-900 border border-blue-400 text-white px-3 py-1.5 rounded shadow transition flex items-center text-xs font-bold" title="Descargar archivo JSON">
+                    <i class="fas fa-download mr-1.5"></i> <span class="hidden md:inline">Respaldar</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navegación por Pestañas -->
+    <div class="bg-white shadow-sm mb-6">
+        <div class="container mx-auto px-6">
+            <ul class="flex border-b overflow-x-auto whitespace-nowrap scrollbar-custom">
+                <li class="-mb-px mr-1">
+                    <button onclick="cambiarPestana('pestana-prestamos')" id="btn-prestamos" class="bg-white inline-block border-l border-t border-r rounded-t py-3 px-6 text-coppel-blue font-bold transition">
+                        <i class="fas fa-clipboard-list mr-1"></i> Préstamos
+                    </button>
+                </li>
+                <li class="mr-1">
+                    <button onclick="cambiarPestana('pestana-colaboradores')" id="btn-colaboradores" class="bg-white inline-block py-3 px-6 text-gray-500 hover:text-coppel-blue font-semibold transition">
+                        <i class="fas fa-users mr-1"></i> Colaboradores
+                    </button>
+                </li>
+                <li class="mr-1">
+                    <button onclick="cambiarPestana('pestana-tarjetas')" id="btn-tarjetas" class="bg-white inline-block py-3 px-6 text-gray-500 hover:text-coppel-blue font-semibold transition">
+                        <i class="fas fa-id-badge mr-1"></i> Tarjetas
+                    </button>
+                </li>
+                <li class="mr-1">
+                    <button onclick="cambiarPestana('pestana-historial')" id="btn-historial" class="bg-white inline-block py-3 px-6 text-gray-500 hover:text-coppel-blue font-semibold transition">
+                        <i class="fas fa-history mr-1"></i> Historial
+                    </button>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <main class="container mx-auto px-6 pb-12">
+        <!-- ============================================== -->
+        <!-- PESTAÑA 1: DASHBOARD DE PRÉSTAMOS              -->
+        <!-- ============================================== -->
+        <div id="pestana-prestamos" class="pestana-contenido block">
+            
+            <div class="flex flex-col lg:flex-row gap-6">
+                <!-- IZQUIERDA: FORMULARIO PRÉSTAMO -->
+                <div class="lg:w-1/3 bg-white p-6 rounded-lg shadow-md h-fit border-t-4 border-coppel-yellow">
+                    <h2 class="text-xl font-bold mb-4">Asignar Préstamo</h2>
+                    
+                    <form id="form-prestamo">
+                        <div class="mb-4">
+                            <label class="block text-sm font-bold mb-2">Buscar Colaborador</label>
+                            <div class="relative dropdown-container">
+                                <input type="text" id="buscar-colaborador" oninput="filtrarDropdown('buscar-colaborador', 'dropdown-colaboradores')" placeholder="No. Empleado o Nombre..." required autocomplete="off" class="w-full border rounded px-3 py-2 pr-10 focus:outline-none focus:border-coppel-blue border-gray-300 shadow-sm cursor-text">
+                                <button type="button" onclick="toggleCustomDropdown('dropdown-colaboradores')" class="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500 hover:text-coppel-blue hover:bg-gray-100 rounded-r border-l border-gray-300 transition cursor-pointer" title="Ver opciones">
+                                    <i class="fas fa-chevron-down"></i>
+                                </button>
+                                <ul id="dropdown-colaboradores" class="hidden absolute z-50 w-full bg-white border border-gray-300 rounded shadow-lg max-h-48 overflow-y-auto scrollbar-custom top-full mt-1"></ul>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-5">
+                            <label class="block text-sm font-bold mb-2">Tarjeta Disponible</label>
+                            <div class="relative dropdown-container">
+                                <input type="text" id="buscar-tarjeta" oninput="filtrarDropdown('buscar-tarjeta', 'dropdown-tarjetas')" placeholder="Folio..." required autocomplete="off" class="w-full border rounded px-3 py-2 pr-10 focus:outline-none focus:border-coppel-blue border-gray-300 shadow-sm cursor-text">
+                                <button type="button" onclick="toggleCustomDropdown('dropdown-tarjetas')" class="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500 hover:text-coppel-blue hover:bg-gray-100 rounded-r border-l border-gray-300 transition cursor-pointer" title="Ver opciones">
+                                    <i class="fas fa-chevron-down"></i>
+                                </button>
+                                <ul id="dropdown-tarjetas" class="hidden absolute z-50 w-full bg-white border border-gray-300 rounded shadow-lg max-h-48 overflow-y-auto scrollbar-custom top-full mt-1"></ul>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-4 items-end">
+                            <div class="w-1/3">
+                                <div class="flex justify-between items-center mb-2">
+                                    <label class="block text-sm font-bold text-gray-600">Días</label>
+                                    <label class="flex items-center cursor-pointer select-none" title="Marcar si no hay fecha de devolución">
+                                        <div class="relative">
+                                            <input type="checkbox" id="indefinido-switch" class="sr-only" onchange="toggleIndefinido()">
+                                            <div class="block bg-gray-300 w-7 h-4 rounded-full transition toggle-bg"></div>
+                                            <div class="dot absolute left-[2px] top-[2px] bg-white w-3 h-3 rounded-full transition transform toggle-dot"></div>
+                                        </div>
+                                        <div class="ml-1 text-[10px] font-bold text-gray-500">Indefinido</div>
+                                    </label>
+                                </div>
+                                <input type="number" id="dias-prestamo" value="7" min="1" required class="w-full border rounded px-3 py-2 focus:outline-none focus:border-coppel-blue border-gray-300 shadow-sm text-center transition-colors">
+                            </div>
+                            <div class="w-2/3">
+                                <button type="button" onclick="asignarPrestamo()" class="w-full bg-coppel-blue hover:bg-blue-800 text-white font-bold py-2 px-4 rounded shadow h-[42px] flex items-center justify-center transition">
+                                    <i class="fas fa-check mr-2"></i> Crear Préstamo
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- DERECHA: TABLA SCROLLEABLE DE PRÉSTAMOS ACTIVOS CON MINI DASHBOARD -->
+                <div class="lg:w-2/3 bg-white p-6 rounded-lg shadow-md flex flex-col h-fit">
+                    
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-4 gap-4">
+                        <div>
+                            <h2 class="text-xl font-bold mb-2">Tarjetas Prestadas Activas</h2>
+                            <!-- MINI DASHBOARD MINIMALISTA -->
+                            <div class="flex flex-wrap items-center gap-y-2 gap-x-4 bg-gray-50 border border-gray-200 px-3 py-2 rounded-lg text-sm">
+                                <div class="flex items-center"><i class="fas fa-id-badge text-gray-400 mr-1.5"></i><span class="text-gray-600 mr-1 text-xs uppercase font-bold">Total:</span> <span id="dash-total" class="font-black text-gray-800">0</span></div>
+                                <div class="hidden sm:block w-px h-4 bg-gray-300"></div>
+                                <div class="flex items-center"><i class="fas fa-check-circle text-green-500 mr-1.5"></i><span class="text-gray-600 mr-1 text-xs uppercase font-bold">Libres:</span> <span id="dash-disponibles" class="font-black text-green-600">0</span></div>
+                                <div class="hidden sm:block w-px h-4 bg-gray-300"></div>
+                                <div class="flex items-center"><i class="fas fa-car-side text-coppel-blue mr-1.5"></i><span class="text-gray-600 mr-1 text-xs uppercase font-bold">En Uso:</span> <span id="dash-prestadas" class="font-black text-coppel-blue">0</span></div>
+                                <div class="hidden sm:block w-px h-4 bg-gray-300"></div>
+                                <div class="flex items-center"><i class="fas fa-exclamation-triangle text-red-500 mr-1.5"></i><span class="text-gray-600 mr-1 text-xs uppercase font-bold">Vencidas:</span> <span id="dash-vencidas" class="font-black text-red-600">0</span></div>
+                            </div>
+                        </div>
+                        
+                        <!-- BUSCADOR -->
+                        <div class="relative w-full sm:w-64">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400"><i class="fas fa-search"></i></span>
+                            <input type="text" id="search-prestamos" oninput="renderPrestamos()" placeholder="Buscar placa, nombre..." class="w-full border border-gray-300 rounded-full py-1.5 pl-9 pr-3 text-sm focus:outline-none focus:border-coppel-blue bg-white shadow-inner">
+                        </div>
+                    </div>
+                    
+                    <div class="overflow-x-auto overflow-y-auto max-h-[500px] border border-gray-200 rounded-lg scrollbar-custom shadow-inner">
+                        <table class="min-w-full divide-y divide-gray-200 text-left text-sm whitespace-nowrap">
+                            <thead class="bg-gray-100 sticky top-0 z-10 shadow-sm">
+                                <tr>
+                                    <th class="px-6 py-3 font-bold text-gray-700 text-center w-40">Folio</th>
+                                    <th class="px-6 py-3 font-bold text-gray-700">Colaborador</th>
+                                    <th class="px-4 py-3 font-bold text-gray-700">Vencimiento</th>
+                                    <th class="px-4 py-3 font-bold text-gray-700 text-center">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="lista-prestamos" class="bg-white divide-y divide-gray-200">
+                                <!-- Las filas se llenan con JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- PESTAÑA 2: MÓDULO DE COLABORADORES             -->
+        <!-- ============================================== -->
+        <div id="pestana-colaboradores" class="pestana-contenido hidden">
+            <div class="flex flex-col lg:flex-row gap-6">
+                <!-- PANEL IZQUIERDO -->
+                <div class="lg:w-1/3 bg-white p-6 rounded-lg shadow-md h-fit border-t-4 border-green-500">
+                    <h2 class="text-xl font-bold mb-4 border-b pb-2">Registrar Colaborador</h2>
+                    
+                    <form id="form-colaborador">
+                        <input type="number" id="colab-num" placeholder="No. Empleado (Ej. 90012345)" required class="w-full border rounded px-3 py-2 mb-3 focus:outline-none focus:border-green-500">
+                        <input type="text" id="colab-nombre" placeholder="Nombre Completo" required class="w-full border rounded px-3 py-2 mb-3 focus:outline-none focus:border-green-500">
+                        <input type="email" id="colab-correo" placeholder="Correo corporativo" required class="w-full border rounded px-3 py-2 mb-3 focus:outline-none focus:border-green-500">
+                        
+                        <!-- VEHÍCULO 1 -->
+                        <div class="bg-gray-50 p-3 rounded border mb-3">
+                            <h4 class="text-xs font-bold text-gray-500 mb-2">Vehículo Principal</h4>
+                            <input type="text" id="colab-placas" placeholder="Placas (Ej. ABC-123)" required class="w-full border rounded px-3 py-2 mb-2 uppercase focus:outline-none focus:border-green-500">
+                            <input type="text" id="colab-tc" placeholder="Folio Tarjeta Circulación" required class="w-full border rounded px-3 py-2 mb-2 uppercase focus:outline-none focus:border-green-500">
+                            <label class="block text-xs font-bold text-gray-600 mb-1">Foto TC (Opcional)</label>
+                            <input type="file" id="colab-foto-tc" accept="image/*" class="w-full border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-green-500 bg-white file:mr-3 file:py-1 file:px-3 file:border-0 file:text-xs file:font-bold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 cursor-pointer text-gray-500">
+                        </div>
+
+                        <!-- BOTÓN MOSTRAR VEHÍCULO 2 -->
+                        <button type="button" onclick="toggleVehiculoExtra()" id="btn-mostrar-v2" class="text-sm text-coppel-blue font-bold mb-3 hover:underline flex items-center">
+                            <i class="fas fa-plus-circle mr-1"></i> Agregar vehículo adicional
+                        </button>
+
+                        <!-- VEHÍCULO 2 (OCULTO POR DEFECTO) -->
+                        <div id="vehiculo-extra-container" class="hidden bg-blue-50 p-3 rounded border border-blue-200 mb-4">
+                            <div class="flex justify-between items-center mb-2">
+                                <h4 class="text-xs font-bold text-coppel-blue">Vehículo Adicional</h4>
+                                <button type="button" onclick="toggleVehiculoExtra()" class="text-xs text-red-500 hover:underline"><i class="fas fa-times"></i> Quitar</button>
+                            </div>
+                            <input type="text" id="colab-placas-2" placeholder="Placas Vehículo 2" class="w-full border rounded px-3 py-2 mb-2 uppercase focus:outline-none focus:border-coppel-blue">
+                            <input type="text" id="colab-tc-2" placeholder="Folio Tarjeta Circulación 2" class="w-full border rounded px-3 py-2 mb-2 uppercase focus:outline-none focus:border-coppel-blue">
+                            <label class="block text-xs font-bold text-gray-600 mb-1">Foto TC 2 (Opcional)</label>
+                            <input type="file" id="colab-foto-tc-2" accept="image/*" class="w-full border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-coppel-blue bg-white file:mr-3 file:py-1 file:px-3 file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-coppel-blue hover:file:bg-blue-100 cursor-pointer text-gray-500">
+                        </div>
+
+                        <button type="button" onclick="registrarColaborador()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded shadow transition">
+                            <i class="fas fa-save mr-2"></i> Guardar
+                        </button>
+                    </form>
+
+                    <div class="mt-6 pt-4 border-t border-gray-200">
+                        <h3 class="text-sm font-bold mb-2 text-gray-700"><i class="fas fa-file-import mr-1"></i> Importación Masiva</h3>
+                        <input type="file" id="archivo-excel" accept=".xls,.xlsx" class="hidden" onchange="procesarExcel(event)">
+                        <button type="button" onclick="document.getElementById('archivo-excel').click()" class="w-full bg-coppel-blue hover:bg-blue-800 text-white font-bold py-2 px-4 rounded shadow transition">
+                            <i class="fas fa-file-excel mr-2"></i> Subir Excel (.xlsx)
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- PANEL DERECHO -->
+                <div class="lg:w-2/3 bg-white p-6 rounded-lg shadow-md flex flex-col h-fit">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
+                        <h2 class="text-xl font-bold">Base de Datos - Colaboradores</h2>
+                        <div class="flex items-center gap-3">
+                            <!-- BUSCADOR -->
+                            <div class="relative w-full sm:w-56">
+                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400"><i class="fas fa-search"></i></span>
+                                <input type="text" id="search-colaboradores" oninput="renderColaboradores()" placeholder="Buscar empleado..." class="w-full border border-gray-300 rounded-full py-1.5 pl-9 pr-3 text-sm focus:outline-none focus:border-coppel-blue bg-gray-50">
+                            </div>
+                            <button type="button" onclick="exportarExcelColaboradores()" class="bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 px-3 py-1.5 rounded text-xs font-bold transition flex items-center shadow-sm whitespace-nowrap">
+                                <i class="fas fa-file-export mr-1.5"></i> Exportar
+                            </button>
+                            <span id="contador-colaboradores" class="bg-gray-100 text-gray-600 px-3 py-1.5 rounded text-xs font-bold border whitespace-nowrap">0</span>
+                        </div>
+                    </div>
+                    
+                    <div class="overflow-x-auto overflow-y-auto max-h-[500px] border border-gray-200 rounded-lg scrollbar-custom shadow-inner">
+                        <table class="min-w-full divide-y divide-gray-200 text-left text-sm whitespace-nowrap">
+                            <thead class="bg-gray-100 sticky top-0 z-10 shadow-sm">
+                                <tr>
+                                    <th class="px-4 py-3 font-bold text-gray-700 w-12 text-center" title="Prioridad en cola">Cola</th>
+                                    <th class="px-2 py-3 font-bold text-gray-700">No. Emp</th>
+                                    <th class="px-4 py-3 font-bold text-gray-700">Nombre Completo</th>
+                                    <th class="px-4 py-3 font-bold text-gray-700">Placas / TC</th>
+                                    <th class="px-4 py-3 font-bold text-gray-700 text-center">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="lista-colaboradores" class="bg-white divide-y divide-gray-200"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- PESTAÑA 3: MÓDULO DE TARJETAS (INVENTARIO)     -->
+        <!-- ============================================== -->
+        <div id="pestana-tarjetas" class="pestana-contenido hidden">
+            <div class="flex flex-col md:flex-row gap-8">
+                <!-- PANEL IZQUIERDO -->
+                <div class="md:w-1/3 bg-white p-6 rounded-lg shadow-md h-fit border-t-4 border-gray-800">
+                    <h2 class="text-xl font-bold mb-4 border-b pb-2">Alta de Tarjeta Física</h2>
+                    
+                    <form id="form-tarjeta">
+                        <input type="text" id="tarjeta-folio" placeholder="Ej. 1, 2, 3..." required class="w-full border rounded px-3 py-2 mb-4 focus:outline-none focus:border-gray-800">
+                        <button type="button" onclick="registrarTarjeta()" class="w-full bg-gray-800 hover:bg-black text-white font-bold py-2 px-4 rounded shadow transition">
+                            <i class="fas fa-plus mr-2"></i> Agregar al Inventario
+                        </button>
+                    </form>
+                </div>
+                
+                <!-- PANEL DERECHO -->
+                <div class="md:w-2/3 bg-white p-6 rounded-lg shadow-md flex flex-col h-fit">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-bold">Inventario de Tarjetas</h2>
+                        <div class="flex items-center gap-2 w-full sm:w-auto">
+                            <!-- BUSCADOR -->
+                            <div class="relative w-full sm:w-56">
+                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400"><i class="fas fa-search"></i></span>
+                                <input type="text" id="search-tarjetas" oninput="renderTarjetas()" placeholder="Buscar folio..." class="w-full border border-gray-300 rounded-full py-1.5 pl-9 pr-3 text-sm focus:outline-none focus:border-gray-800 bg-gray-50">
+                            </div>
+                            <span id="contador-tarjetas" class="bg-gray-100 text-gray-800 px-3 py-1.5 rounded-full text-xs font-bold border border-gray-300 whitespace-nowrap">0 Tarjetas</span>
+                        </div>
+                    </div>
+                    
+                    <div class="overflow-x-auto overflow-y-auto max-h-[500px] border border-gray-200 rounded-lg scrollbar-custom shadow-inner">
+                        <table class="min-w-full divide-y divide-gray-200 text-left text-sm whitespace-nowrap">
+                            <thead class="bg-gray-100 sticky top-0 z-10 shadow-sm">
+                                <tr>
+                                    <th class="px-6 py-3 font-bold text-gray-700 text-center w-40">Folio</th>
+                                    <th class="px-6 py-3 font-bold text-gray-700">Estado</th>
+                                    <th class="px-4 py-3 font-bold text-gray-700 text-center">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="lista-inventario-tarjetas" class="bg-white divide-y divide-gray-200">
+                                <!-- Las filas se llenan con JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- PESTAÑA 4: HISTORIAL                           -->
+        <!-- ============================================== -->
+        <div id="pestana-historial" class="pestana-contenido hidden">
+            <div class="bg-white p-6 rounded-lg shadow-md flex flex-col h-fit border-t-4 border-purple-600">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
+                    <h2 class="text-xl font-bold"><i class="fas fa-history mr-2 text-purple-600"></i> Historial de Préstamos</h2>
+                    
+                    <!-- BUSCADOR -->
+                    <div class="flex items-center gap-2 w-full sm:w-auto">
+                        <div class="relative w-full sm:w-64">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400"><i class="fas fa-search"></i></span>
+                            <input type="text" id="search-historial" oninput="renderHistorial()" placeholder="Buscar folio o nombre..." class="w-full border border-gray-300 rounded-full py-1.5 pl-9 pr-3 text-sm focus:outline-none focus:border-purple-600 bg-gray-50">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="overflow-x-auto overflow-y-auto max-h-[600px] border border-gray-200 rounded-lg scrollbar-custom shadow-inner">
+                    <table class="min-w-full divide-y divide-gray-200 text-left text-sm whitespace-nowrap">
+                        <thead class="bg-gray-100 sticky top-0 z-10 shadow-sm">
+                            <tr>
+                                <th class="px-6 py-3 font-bold text-gray-700 text-center w-32">Folio Usado</th>
+                                <th class="px-6 py-3 font-bold text-gray-700">Colaborador</th>
+                                <th class="px-4 py-3 font-bold text-gray-700">Fecha de Préstamo</th>
+                                <th class="px-4 py-3 font-bold text-gray-700">Devuelto el</th>
+                                <th class="px-4 py-3 font-bold text-gray-700 text-center">Estatus</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lista-historial" class="bg-white divide-y divide-gray-200"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- INPUT OCULTO PARA AGREGAR FOTO A COLABORADOR EXISTENTE -->
+    <input type="file" id="input-foto-individual" accept="image/*" class="hidden" onchange="subirFotoIndividual(event)">
+
+    <!-- ========================================== -->
+    <!-- ZONA DE MODALES (VENTANAS EMERGENTES)      -->
+    <!-- ========================================== -->
+    
+    <!-- Modal Confirmar Devolución -->
+    <div id="modal-confirmacion" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 transition-opacity">
+        <div class="bg-white rounded-lg p-6 w-96 max-w-[90%] shadow-2xl transform transition-all border-t-4 border-coppel-blue">
+            <div class="flex items-center mb-4">
+                <div class="bg-blue-100 text-coppel-blue rounded-full p-2 mr-3">
+                    <i class="fas fa-undo-alt text-xl"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-900">Confirmar Devolución</h3>
+            </div>
+            <p class="text-sm text-gray-600 mb-6 leading-relaxed">
+                ¿Estás seguro de que deseas procesar la devolución? <br><br>
+                El registro se enviará al <b>Historial</b> y el Folio volverá a estar disponible.
+            </p>
+            <div class="flex justify-end gap-3">
+                <button onclick="cerrarModalConfirmacion()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded shadow-sm hover:bg-gray-200 font-bold text-sm transition">Cancelar</button>
+                <button onclick="procesarDevolucionConfirmada()" class="px-4 py-2 bg-coppel-blue text-white rounded shadow-sm hover:bg-blue-800 font-bold text-sm transition flex items-center">
+                    <i class="fas fa-check mr-2"></i> Sí, Devolver
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Eliminar Tarjeta -->
+    <div id="modal-eliminar-tarjeta" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 transition-opacity">
+        <div class="bg-white rounded-lg p-6 w-96 max-w-[90%] shadow-2xl transform transition-all border-t-4 border-red-500">
+            <div class="flex items-center mb-4">
+                <div class="bg-red-100 text-red-500 rounded-full p-2 mr-3">
+                    <i class="fas fa-trash-alt text-xl"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-900">Eliminar Tarjeta</h3>
+            </div>
+            <p class="text-sm text-gray-600 mb-6 leading-relaxed">
+                ¿Estás seguro de que deseas eliminar permanentemente esta tarjeta del inventario?
+            </p>
+            <div class="flex justify-end gap-3">
+                <button onclick="cerrarModalEliminarTarjeta()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded shadow-sm hover:bg-gray-200 font-bold text-sm transition">Cancelar</button>
+                <button onclick="procesarEliminarTarjetaConfirmada()" class="px-4 py-2 bg-red-500 text-white rounded shadow-sm hover:bg-red-700 font-bold text-sm transition flex items-center">
+                    <i class="fas fa-trash mr-2"></i> Sí, Eliminar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Eliminar Colaborador -->
+    <div id="modal-eliminar-colaborador" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 transition-opacity">
+        <div class="bg-white rounded-lg p-6 w-96 max-w-[90%] shadow-2xl transform transition-all border-t-4 border-red-500">
+            <div class="flex items-center mb-4">
+                <div class="bg-red-100 text-red-500 rounded-full p-2 mr-3">
+                    <i class="fas fa-user-times text-xl"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-900">Eliminar Colaborador</h3>
+            </div>
+            <p class="text-sm text-gray-600 mb-6 leading-relaxed">
+                ¿Estás seguro de que deseas dar de baja a este colaborador del sistema?
+            </p>
+            <div class="flex justify-end gap-3">
+                <button onclick="cerrarModalEliminarColaborador()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded shadow-sm hover:bg-gray-200 font-bold text-sm transition">Cancelar</button>
+                <button onclick="procesarEliminarColaboradorConfirmado()" class="px-4 py-2 bg-red-500 text-white rounded shadow-sm hover:bg-red-700 font-bold text-sm transition flex items-center">
+                    <i class="fas fa-trash mr-2"></i> Sí, Eliminar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Editar Colaborador -->
+    <div id="modal-editar-colaborador" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 transition-opacity">
+        <div class="bg-white rounded-lg p-6 w-[700px] max-w-[95%] shadow-2xl max-h-[95vh] overflow-y-auto border-t-4 border-blue-500">
+            <div class="flex items-center mb-4 border-b pb-3">
+                <div class="bg-blue-100 text-blue-500 rounded-full p-2 mr-3">
+                    <i class="fas fa-user-edit text-xl"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-900">Editar Colaborador</h3>
+            </div>
+            
+            <form id="form-editar-colaborador" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <h4 class="text-sm font-bold text-gray-500 mb-2 border-b pb-1">Datos Personales</h4>
+                    <input type="number" id="edit-colab-num" placeholder="No. Empleado" required class="w-full border rounded px-3 py-2 mb-3 focus:outline-none focus:border-blue-500">
+                    <input type="text" id="edit-colab-nombre" placeholder="Nombre Completo" required class="w-full border rounded px-3 py-2 mb-3 focus:outline-none focus:border-blue-500">
+                    <input type="email" id="edit-colab-correo" placeholder="Correo corporativo" required class="w-full border rounded px-3 py-2 mb-3 focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <div class="bg-gray-50 p-3 rounded border mb-3">
+                        <h4 class="text-xs font-bold text-gray-500 mb-2">Vehículo Principal</h4>
+                        <input type="text" id="edit-colab-placas" placeholder="Placas (Ej. ABC-123)" required class="w-full border rounded px-3 py-1.5 mb-2 uppercase text-sm focus:outline-none focus:border-blue-500">
+                        <input type="text" id="edit-colab-tc" placeholder="Folio TC" required class="w-full border rounded px-3 py-1.5 mb-2 uppercase text-sm focus:outline-none focus:border-blue-500">
+                        <label class="block text-[10px] font-bold text-gray-600 mb-1">Reemplazar Foto TC</label>
+                        <input type="file" id="edit-colab-foto-tc" accept="image/*" class="w-full border rounded px-2 py-1 text-xs bg-white text-gray-500">
+                    </div>
+
+                    <div class="bg-blue-50 p-3 rounded border border-blue-200">
+                        <h4 class="text-xs font-bold text-coppel-blue mb-2">Vehículo Adicional</h4>
+                        <input type="text" id="edit-colab-placas-2" placeholder="Placas V2 (Opcional)" class="w-full border rounded px-3 py-1.5 mb-2 uppercase text-sm focus:outline-none focus:border-blue-500">
+                        <input type="text" id="edit-colab-tc-2" placeholder="Folio TC 2" class="w-full border rounded px-3 py-1.5 mb-2 uppercase text-sm focus:outline-none focus:border-blue-500">
+                        <label class="block text-[10px] font-bold text-gray-600 mb-1">Reemplazar Foto TC 2</label>
+                        <input type="file" id="edit-colab-foto-tc-2" accept="image/*" class="w-full border rounded px-2 py-1 text-xs bg-white text-gray-500">
+                    </div>
+                </div>
+            </form>
+
+            <div class="flex justify-end gap-3 mt-6 pt-4 border-t">
+                <button onclick="cerrarModalEditarColaborador()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded shadow-sm hover:bg-gray-200 font-bold text-sm transition">Cancelar</button>
+                <button onclick="guardarEdicionColaborador()" class="px-4 py-2 bg-blue-500 text-white rounded shadow-sm hover:bg-blue-700 font-bold text-sm transition flex items-center">
+                    <i class="fas fa-save mr-2"></i> Guardar Cambios
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Visor de Foto TC -->
+    <div id="modal-ver-foto" class="fixed inset-0 bg-black bg-opacity-75 hidden items-center justify-center z-[60] transition-opacity">
+        <div class="bg-white rounded-lg p-4 w-[600px] max-w-[95%] shadow-2xl relative">
+            <button onclick="cerrarModalFoto()" class="absolute -top-3 -right-3 bg-red-500 hover:bg-red-700 text-white rounded-full w-8 h-8 flex items-center justify-center transition shadow-md border-2 border-white">
+                <i class="fas fa-times"></i>
+            </button>
+            <h3 class="text-lg font-bold mb-3 text-gray-800 border-b pb-2"><i class="fas fa-image mr-2 text-gray-400"></i> Tarjeta de Circulación</h3>
+            <div class="flex justify-center bg-gray-100 rounded border border-dashed border-gray-300 p-2 min-h-[200px]">
+                <img id="img-visor-tc" src="" alt="Tarjeta de Circulación" class="max-w-full max-h-[60vh] object-contain rounded">
+            </div>
+        </div>
+    </div>
+
+    <!-- Notificación Toast -->
+    <div id="toast" class="fixed bottom-5 right-5 text-white px-6 py-3 rounded shadow-lg transition-opacity duration-300 opacity-0 hidden z-50">
+        <span id="toast-msg">Exito</span>
+    </div>
+
+    <!-- SCRIPT PRINCIPAL -->
+    <script>
+        let db = { colaboradores: [], tarjetas: [], prestamos: [], historial: [] };
+        
+        let idPrestamoPendiente = null;
+        let idTarjetaPendiente = null;
+        let idTarjetaEliminarPendiente = null;
+        let idColaboradorEliminarPendiente = null;
+        let idColaboradorParaFoto = null;
+        let indiceVehiculoParaFoto = 1;
+        let idColaboradorEdicion = null;
+
+        function init() {
+            try {
+                const dataGuardada = localStorage.getItem('coppel_carpool_db');
+                if (dataGuardada) {
+                    db = JSON.parse(dataGuardada);
+                    if(!db.colaboradores) db.colaboradores = [];
+                    if(!db.tarjetas) db.tarjetas = [];
+                    if(!db.prestamos) db.prestamos = [];
+                    if(!db.historial) db.historial = [];
+                }
+            } catch (e) {
+                console.warn("localStorage bloqueado. Usando memoria temporal.");
+            }
+            actualizarInterfazGeneral();
+        }
+
+        function guardarData() {
+            try {
+                localStorage.setItem('coppel_carpool_db', JSON.stringify(db));
+            } catch (e) {
+                console.warn("No se pudo guardar en localStorage.");
+            }
+            actualizarInterfazGeneral();
+        }
+
+        // ==========================================
+        // RESTAURAR BASE DE DATOS DESDE JSON
+        // ==========================================
+        function procesarRestauracionBD(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(evento) {
+                try {
+                    const dbRestaurada = JSON.parse(evento.target.result);
+                    if(dbRestaurada.colaboradores && dbRestaurada.tarjetas) {
+                        db = dbRestaurada;
+                        guardarData();
+                        mostrarToast("Base de datos restaurada con éxito", "bg-green-500");
+                    } else {
+                        throw new Error("El archivo no tiene el formato correcto.");
+                    }
+                } catch (error) {
+                    alert("Error al leer el archivo. Asegúrate de que sea un respaldo JSON válido.");
+                }
+                document.getElementById('input-restaurar-bd').value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        // ==========================================
+        // DASHBOARD Y RESPALDO
+        // ==========================================
+        function actualizarDashboard() {
+            document.getElementById('dash-total').innerText = db.tarjetas.length;
+            const disponibles = db.tarjetas.filter(t => t.estado === 'Disponible').length;
+            document.getElementById('dash-disponibles').innerText = disponibles;
+            document.getElementById('dash-prestadas').innerText = db.prestamos.length;
+            
+            let vencidas = 0;
+            const hoy = new Date();
+            hoy.setHours(0,0,0,0);
+            db.prestamos.forEach(p => {
+                if(!p.indefinido) {
+                    const fin = new Date(p.fecha_fin);
+                    fin.setHours(0,0,0,0);
+                    if (fin < hoy) vencidas++;
+                }
+            });
+            document.getElementById('dash-vencidas').innerText = vencidas;
+        }
+
+        function descargarRespaldoJSON() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db, null, 2));
+            const dlAnchorElem = document.createElement('a');
+            dlAnchorElem.setAttribute("href", dataStr);
+            dlAnchorElem.setAttribute("download", "Respaldo_Carpool_" + new Date().toISOString().split('T')[0] + ".json");
+            dlAnchorElem.click();
+            mostrarToast("Base de datos respaldada", "bg-green-500");
+        }
+
+        // ==========================================
+        // TOGGLE SWITCH INDEFINIDO & VEHÍCULO EXTRA
+        // ==========================================
+        function toggleIndefinido() {
+            const input = document.getElementById('dias-prestamo');
+            const isChecked = document.getElementById('indefinido-switch').checked;
+            if(isChecked) {
+                input.disabled = true;
+                input.value = '';
+                input.classList.add('bg-gray-100', 'cursor-not-allowed');
+                input.removeAttribute('required');
+            } else {
+                input.disabled = false;
+                input.value = '7';
+                input.classList.remove('bg-gray-100', 'cursor-not-allowed');
+                input.setAttribute('required', 'required');
+            }
+        }
+
+        function toggleVehiculoExtra() {
+            const container = document.getElementById('vehiculo-extra-container');
+            const btn = document.getElementById('btn-mostrar-v2');
+            if (container.classList.contains('hidden')) {
+                container.classList.remove('hidden');
+                btn.classList.add('hidden');
+            } else {
+                container.classList.add('hidden');
+                btn.classList.remove('hidden');
+                document.getElementById('colab-placas-2').value = '';
+                document.getElementById('colab-tc-2').value = '';
+                document.getElementById('colab-foto-tc-2').value = '';
+            }
+        }
+
+        // ==========================================
+        // DROPDOWNS CUSTOM Y PESTAÑAS
+        // ==========================================
+        function toggleCustomDropdown(dropdownId) {
+            cerrarDropdowns(dropdownId);
+            const dropdown = document.getElementById(dropdownId);
+            if (dropdown) {
+                dropdown.classList.toggle('hidden');
+                if(!dropdown.classList.contains('hidden')) {
+                    const items = dropdown.getElementsByTagName('li');
+                    for (let i = 0; i < items.length; i++) items[i].style.display = "";
+                }
+            }
+        }
+
+        function cerrarDropdowns(exceptoId = null) {
+            ['dropdown-colaboradores', 'dropdown-tarjetas'].forEach(id => {
+                if (id !== exceptoId) {
+                    const drop = document.getElementById(id);
+                    if (drop) drop.classList.add('hidden');
+                }
+            });
+        }
+
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.dropdown-container')) {
+                cerrarDropdowns();
+            }
+        });
+
+        function seleccionarOpcion(inputId, dropdownId, valor) {
+            document.getElementById(inputId).value = valor;
+            cerrarDropdowns();
+        }
+
+        function filtrarDropdown(inputId, dropdownId) {
+            const filtro = document.getElementById(inputId).value.toLowerCase();
+            const dropdown = document.getElementById(dropdownId);
+            dropdown.classList.remove('hidden');
+            
+            const items = dropdown.getElementsByTagName('li');
+            for (let i = 0; i < items.length; i++) {
+                const texto = items[i].innerText.toLowerCase();
+                if (texto.includes(filtro)) {
+                    items[i].style.display = "";
+                } else {
+                    items[i].style.display = "none";
+                }
+            }
+        }
+
+        function cambiarPestana(idActiva) {
+            document.querySelectorAll('.pestana-contenido').forEach(p => p.classList.add('hidden'));
+            document.getElementById(idActiva).classList.remove('hidden');
+            
+            ['btn-prestamos', 'btn-colaboradores', 'btn-tarjetas', 'btn-historial'].forEach(b => {
+                const btn = document.getElementById(b);
+                btn.classList.remove('border-l', 'border-t', 'border-r', 'rounded-t', 'text-coppel-blue');
+                btn.classList.add('text-gray-500');
+            });
+            
+            const btnActivo = document.getElementById(`btn-${idActiva.split('-')[1]}`);
+            btnActivo.classList.add('border-l', 'border-t', 'border-r', 'rounded-t', 'text-coppel-blue');
+            btnActivo.classList.remove('text-gray-500');
+        }
+
+        // ==========================================
+        // MODALES
+        // ==========================================
+        function abrirModalConfirmacion(idPrestamo, idTarjeta) {
+            idPrestamoPendiente = idPrestamo;
+            idTarjetaPendiente = idTarjeta;
+            const modal = document.getElementById('modal-confirmacion');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+        function cerrarModalConfirmacion() {
+            idPrestamoPendiente = null;
+            idTarjetaPendiente = null;
+            const modal = document.getElementById('modal-confirmacion');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+        
+        function procesarDevolucionConfirmada() {
+            if (!idPrestamoPendiente || !idTarjetaPendiente) return;
+            
+            const prestamoIndex = db.prestamos.findIndex(p => String(p.id) === String(idPrestamoPendiente));
+            if (prestamoIndex !== -1) {
+                const prestamo = db.prestamos[prestamoIndex];
+                
+                db.historial.push({
+                    ...prestamo,
+                    fecha_devolucion_real: new Date().toISOString()
+                });
+
+                const tarjetaEncontrada = db.tarjetas.find(t => String(t.id) === String(idTarjetaPendiente));
+                if (tarjetaEncontrada) tarjetaEncontrada.estado = 'Disponible';
+                
+                db.prestamos.splice(prestamoIndex, 1);
+            }
+            
+            guardarData();
+            cerrarModalConfirmacion();
+            mostrarToast("Devolución procesada y guardada en el Historial.", "bg-green-500");
+        }
+
+        function abrirModalEliminarTarjeta(id) {
+            if (db.prestamos.find(p => String(p.id_tarjeta) === String(id))) {
+                mostrarToast('No puedes eliminar esta tarjeta porque está en uso actualmente.', 'bg-red-500');
+                return;
+            }
+            idTarjetaEliminarPendiente = id;
+            const modal = document.getElementById('modal-eliminar-tarjeta');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+        function cerrarModalEliminarTarjeta() {
+            idTarjetaEliminarPendiente = null;
+            const modal = document.getElementById('modal-eliminar-tarjeta');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+        function procesarEliminarTarjetaConfirmada() {
+            if (!idTarjetaEliminarPendiente) return;
+            db.tarjetas = db.tarjetas.filter(t => String(t.id) !== String(idTarjetaEliminarPendiente));
+            guardarData();
+            cerrarModalEliminarTarjeta();
+            mostrarToast("Tarjeta eliminada permanentemente.", "bg-gray-600");
+        }
+
+        function abrirModalEliminarColaborador(id) {
+            if (db.prestamos.find(p => String(p.id_colaborador) === String(id))) {
+                mostrarToast('No puedes eliminar a este colaborador porque tiene una tarjeta prestada.', 'bg-red-500');
+                return;
+            }
+            idColaboradorEliminarPendiente = id;
+            const modal = document.getElementById('modal-eliminar-colaborador');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+        function cerrarModalEliminarColaborador() {
+            idColaboradorEliminarPendiente = null;
+            const modal = document.getElementById('modal-eliminar-colaborador');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+        function procesarEliminarColaboradorConfirmado() {
+            if (!idColaboradorEliminarPendiente) return;
+            const colab = db.colaboradores.find(c => String(c.id) === String(idColaboradorEliminarPendiente));
+            if (colab && colab.prioridad > 0) {
+                const prioAntigua = colab.prioridad;
+                db.colaboradores.forEach(c => { if (c.prioridad > prioAntigua) c.prioridad -= 1; });
+            }
+            db.colaboradores = db.colaboradores.filter(c => String(c.id) !== String(idColaboradorEliminarPendiente));
+            guardarData();
+            cerrarModalEliminarColaborador();
+            mostrarToast("Colaborador eliminado del sistema.", "bg-gray-600");
+        }
+
+        function verFotoTC(idColaborador, vehiculoIndex) {
+            const colab = db.colaboradores.find(c => String(c.id) === String(idColaborador));
+            if(colab) {
+                const foto = vehiculoIndex === 1 ? colab.foto_tc : colab.foto_tc_2;
+                if(foto) {
+                    document.getElementById('img-visor-tc').src = foto;
+                    const modal = document.getElementById('modal-ver-foto');
+                    modal.classList.remove('hidden');
+                    modal.classList.add('flex');
+                }
+            }
+        }
+        function cerrarModalFoto() {
+            const modal = document.getElementById('modal-ver-foto');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            document.getElementById('img-visor-tc').src = "";
+        }
+
+        function abrirCargaFoto(id, vehiculoIndex) {
+            idColaboradorParaFoto = id;
+            indiceVehiculoParaFoto = vehiculoIndex;
+            document.getElementById('input-foto-individual').click();
+        }
+
+        async function subirFotoIndividual(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            if (file.size > 2 * 1024 * 1024) { 
+                mostrarToast("La imagen es muy pesada (Máx 2MB)", "bg-red-500");
+                e.target.value = '';
+                return;
+            }
+
+            try {
+                const fotoBase64 = await convertirABase64(file);
+                const colab = db.colaboradores.find(c => String(c.id) === String(idColaboradorParaFoto));
+                if (colab) {
+                    if (indiceVehiculoParaFoto === 1) colab.foto_tc = fotoBase64;
+                    else colab.foto_tc_2 = fotoBase64;
+                    guardarData();
+                    mostrarToast("Foto guardada correctamente", "bg-green-500");
+                }
+            } catch (error) {
+                mostrarToast("Error al cargar la imagen", "bg-red-500");
+            }
+            e.target.value = '';
+        }
+
+        function abrirModalEditarColaborador(id) {
+            const colab = db.colaboradores.find(c => String(c.id) === String(id));
+            if(!colab) return;
+            idColaboradorEdicion = id;
+
+            document.getElementById('edit-colab-num').value = colab.num;
+            document.getElementById('edit-colab-nombre').value = colab.nombre;
+            document.getElementById('edit-colab-correo').value = colab.correo;
+            
+            document.getElementById('edit-colab-placas').value = colab.placas;
+            document.getElementById('edit-colab-tc').value = colab.tc;
+            
+            document.getElementById('edit-colab-placas-2').value = colab.placas_2 || '';
+            document.getElementById('edit-colab-tc-2').value = colab.tc_2 || '';
+
+            document.getElementById('edit-colab-foto-tc').value = '';
+            document.getElementById('edit-colab-foto-tc-2').value = '';
+
+            const modal = document.getElementById('modal-editar-colaborador');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function cerrarModalEditarColaborador() {
+            idColaboradorEdicion = null;
+            const modal = document.getElementById('modal-editar-colaborador');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        async function guardarEdicionColaborador() {
+            if (!idColaboradorEdicion) return;
+
+            const form = document.getElementById('form-editar-colaborador');
+            if (!form.checkValidity()) { form.reportValidity(); return; }
+
+            const num = document.getElementById('edit-colab-num').value.trim();
+            const nombre = document.getElementById('edit-colab-nombre').value.trim();
+            const correo = document.getElementById('edit-colab-correo').value.trim();
+            const placas = document.getElementById('edit-colab-placas').value.trim();
+            const tc = document.getElementById('edit-colab-tc').value.trim();
+            const placas_2 = document.getElementById('edit-colab-placas-2').value.trim();
+            const tc_2 = document.getElementById('edit-colab-tc-2').value.trim();
+
+            const existe = db.colaboradores.find(c => c.num === num && String(c.id) !== String(idColaboradorEdicion));
+            if(existe) return mostrarToast("Ese número de empleado ya pertenece a otro registro", "bg-red-500");
+
+            const colab = db.colaboradores.find(c => String(c.id) === String(idColaboradorEdicion));
+            if(!colab) return;
+
+            let foto1 = colab.foto_tc;
+            let foto2 = colab.foto_tc_2;
+
+            const file1 = document.getElementById('edit-colab-foto-tc').files[0];
+            const file2 = document.getElementById('edit-colab-foto-tc-2').files[0];
+
+            if(file1) {
+                if(file1.size > 2 * 1024 * 1024) return mostrarToast("Imagen V1 muy pesada", "bg-red-500");
+                try { foto1 = await convertirABase64(file1); } catch(e) {}
+            }
+            if(file2) {
+                if(file2.size > 2 * 1024 * 1024) return mostrarToast("Imagen V2 muy pesada", "bg-red-500");
+                try { foto2 = await convertirABase64(file2); } catch(e) {}
+            }
+
+            colab.num = num;
+            colab.nombre = nombre;
+            colab.correo = correo;
+            colab.placas = placas;
+            colab.tc = tc;
+            colab.foto_tc = foto1;
+
+            if (placas_2) {
+                colab.placas_2 = placas_2;
+                colab.tc_2 = tc_2;
+                colab.foto_tc_2 = foto2;
+            } else {
+                colab.placas_2 = null;
+                colab.tc_2 = null;
+                colab.foto_tc_2 = null;
+            }
+
+            guardarData();
+            cerrarModalEditarColaborador();
+            mostrarToast("Registro actualizado correctamente", "bg-blue-500");
+        }
+
+        function togglePrioridad(id) {
+            const colab = db.colaboradores.find(c => String(c.id) === String(id));
+            if(colab) {
+                if (colab.prioridad > 0) {
+                    const prioAntigua = colab.prioridad;
+                    colab.prioridad = 0;
+                    db.colaboradores.forEach(c => { if (c.prioridad > prioAntigua) c.prioridad -= 1; });
+                } else {
+                    const maxPrio = db.colaboradores.reduce((max, c) => Math.max(max, c.prioridad || 0), 0);
+                    colab.prioridad = maxPrio + 1;
+                }
+                guardarData();
+            }
+        }
+
+
+        // ==========================================
+        // PROCESOS DE NEGOCIO Y EXPORTAR
+        // ==========================================
+        function exportarExcelColaboradores() {
+            if (db.colaboradores.length === 0) {
+                mostrarToast("No hay datos para exportar", "bg-yellow-500");
+                return;
+            }
+            const datosExportar = db.colaboradores.map(c => ({
+                "Prioridad (Cola)": c.prioridad > 0 ? c.prioridad : "NO",
+                "No. Empleado": c.num,
+                "Nombre Completo": c.nombre,
+                "Correo Corporativo": c.correo,
+                "Placas": c.placas,
+                "Folio TC": c.tc,
+                "Placas V2": c.placas_2 || '',
+                "Folio TC V2": c.tc_2 || ''
+            }));
+            const hoja = XLSX.utils.json_to_sheet(datosExportar);
+            const libro = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(libro, hoja, "Colaboradores");
+            XLSX.writeFile(libro, "Base_Datos_Colaboradores.xlsx");
+            mostrarToast("Archivo exportado correctamente", "bg-green-500");
+        }
+        
+        function convertirABase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+            });
+        }
+
+        async function registrarColaborador() {
+            const form = document.getElementById('form-colaborador');
+            if (!form.checkValidity()) { form.reportValidity(); return; }
+
+            const num = document.getElementById('colab-num').value.trim();
+            const nombre = document.getElementById('colab-nombre').value.trim();
+            const correo = document.getElementById('colab-correo').value.trim();
+            
+            const placas = document.getElementById('colab-placas').value.trim();
+            const tc = document.getElementById('colab-tc').value.trim();
+            const fotoInput = document.getElementById('colab-foto-tc');
+            
+            const placas_2 = document.getElementById('colab-placas-2').value.trim();
+            const tc_2 = document.getElementById('colab-tc-2').value.trim();
+            const fotoInput_2 = document.getElementById('colab-foto-tc-2');
+
+            if(db.colaboradores.find(c => c.num === num)) return mostrarToast("Este número de colaborador ya existe", "bg-red-500");
+            
+            let fotoBase64 = null;
+            if(fotoInput.files && fotoInput.files[0]) {
+                const file = fotoInput.files[0];
+                if(file.size > 2 * 1024 * 1024) return mostrarToast("Imagen V1 muy pesada (Máx 2MB)", "bg-red-500");
+                try { fotoBase64 = await convertirABase64(file); } catch(e) { return mostrarToast("Error al cargar imagen V1", "bg-red-500"); }
+            }
+
+            let fotoBase64_2 = null;
+            if(fotoInput_2.files && fotoInput_2.files[0]) {
+                const file2 = fotoInput_2.files[0];
+                if(file2.size > 2 * 1024 * 1024) return mostrarToast("Imagen V2 muy pesada (Máx 2MB)", "bg-red-500");
+                try { fotoBase64_2 = await convertirABase64(file2); } catch(e) { return mostrarToast("Error al cargar imagen V2", "bg-red-500"); }
+            }
+
+            db.colaboradores.push({ 
+                id: Date.now(), 
+                num, nombre, correo, 
+                placas, tc, foto_tc: fotoBase64,
+                placas_2, tc_2, foto_tc_2: fotoBase64_2,
+                prioridad: 0 
+            });
+            
+            guardarData();
+            
+            form.reset();
+            document.getElementById('vehiculo-extra-container').classList.add('hidden');
+            document.getElementById('btn-mostrar-v2').classList.remove('hidden');
+            
+            mostrarToast("Colaborador guardado exitosamente", "bg-green-500");
+        }
+
+        function procesarExcel(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(evento) {
+                try {
+                    const data = new Uint8Array(evento.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const filasJSON = XLSX.utils.sheet_to_json(worksheet, {header: 1});
+
+                    let agregados = 0;
+                    let duplicados = 0;
+
+                    for(let i = 1; i < filasJSON.length; i++) {
+                        const row = filasJSON[i];
+                        if (row.length === 0 || !row[0]) continue; 
+
+                        const num = String(row[0]).trim();
+                        const nombre = String(row[1] || '').trim();
+                        const correo = String(row[2] || '').trim();
+                        const placas = String(row[3] || '').trim();
+                        const tc = String(row[4] || '').trim();
+                        
+                        const placas_2 = String(row[5] || '').trim();
+                        const tc_2 = String(row[6] || '').trim();
+
+                        if(!db.colaboradores.find(c => c.num === num)) {
+                            db.colaboradores.push({ 
+                                id: Date.now() + i, 
+                                num, nombre, correo, 
+                                placas, tc, foto_tc: null,
+                                placas_2, tc_2, foto_tc_2: null,
+                                prioridad: 0
+                            });
+                            agregados++;
+                        } else {
+                            duplicados++;
+                        }
+                    }
+
+                    if(agregados > 0) {
+                        guardarData();
+                        mostrarToast(`${agregados} importados exitosamente. (${duplicados} omitidos)`, "bg-green-500");
+                    } else if (duplicados > 0) {
+                        mostrarToast("No se importó ninguno (Todos los folios ya existían).", "bg-yellow-500");
+                    } else {
+                        mostrarToast("El archivo parece estar vacío o con formato incorrecto.", "bg-red-500");
+                    }
+                } catch (error) {
+                    alert("Error al leer el archivo Excel. Revisa el formato.");
+                }
+                document.getElementById('archivo-excel').value = '';
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // ==========================================
+        // RENDER DE TABLAS CON DISEÑO DE EMPTY STATE (CAJA FLEX)
+        // ==========================================
+
+        function renderColaboradores() {
+            const tbody = document.getElementById('lista-colaboradores');
+            const ulColab = document.getElementById('dropdown-colaboradores');
+            const searchVal = document.getElementById('search-colaboradores') ? document.getElementById('search-colaboradores').value.toLowerCase() : '';
+            
+            document.getElementById('contador-colaboradores').innerText = `${db.colaboradores.length} Registros`;
+
+            let filtrados = [...db.colaboradores].filter(c => 
+                c.nombre.toLowerCase().includes(searchVal) || 
+                c.num.toLowerCase().includes(searchVal) || 
+                c.placas.toLowerCase().includes(searchVal) ||
+                (c.placas_2 && c.placas_2.toLowerCase().includes(searchVal))
+            );
+
+            filtrados.sort((a, b) => {
+                const pA = a.prioridad || 0;
+                const pB = b.prioridad || 0;
+                if (pA > 0 && pB > 0) return pA - pB; 
+                if (pA > 0) return -1; 
+                if (pB > 0) return 1;  
+                return b.id - a.id; 
+            });
+
+            // EMPTY STATE 
+            if (filtrados.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-8"><div class="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-10 bg-gray-50 text-gray-400"><i class="fas ${searchVal ? 'fa-search' : 'fa-users'} text-4xl mb-3 block"></i><span class="font-medium">${searchVal ? 'No hay resultados de búsqueda' : 'Sin colaboradores registrados.'}</span></div></td></tr>`;
+            } else {
+                tbody.innerHTML = '';
+            }
+
+            if(ulColab) ulColab.innerHTML = '';
+            
+            filtrados.forEach(c => {
+                let btnFotoHtml1 = c.foto_tc 
+                    ? `<button onclick="verFotoTC('${c.id}', 1)" type="button" class="ml-2 text-coppel-blue hover:text-blue-800 transition px-1" title="Ver foto"><i class="fas fa-image text-sm"></i></button>`
+                    : `<button onclick="abrirCargaFoto('${c.id}', 1)" type="button" class="ml-2 text-gray-400 hover:text-green-600 transition px-1 flex items-center" title="Agregar foto"><i class="fas fa-image text-sm"></i><i class="fas fa-plus text-[9px] -mt-2 ml-0.5 font-black"></i></button>`;
+
+                let v2Html = '';
+                if (c.placas_2) {
+                    let btnFotoHtml2 = c.foto_tc_2 
+                        ? `<button onclick="verFotoTC('${c.id}', 2)" type="button" class="ml-2 text-coppel-blue hover:text-blue-800 transition px-1" title="Ver foto V2"><i class="fas fa-image text-sm"></i></button>`
+                        : `<button onclick="abrirCargaFoto('${c.id}', 2)" type="button" class="ml-2 text-gray-400 hover:text-green-600 transition px-1 flex items-center" title="Agregar foto V2"><i class="fas fa-image text-sm"></i><i class="fas fa-plus text-[9px] -mt-2 ml-0.5 font-black"></i></button>`;
+                           
+                    v2Html = `
+                        <div class="mt-2 pt-2 border-t border-gray-200">
+                            <span class="block font-bold uppercase"><i class="fas fa-car mr-1 text-gray-400"></i>${c.placas_2}</span>
+                            <div class="flex items-center mt-1"><span class="block uppercase"><i class="fas fa-id-card mr-1 text-gray-400"></i>${c.tc_2}</span>${btnFotoHtml2}</div>
+                        </div>
+                    `;
+                }
+
+                const hasPrio = c.prioridad > 0;
+                const rowClass = hasPrio ? 'bg-yellow-50 hover:bg-yellow-100 transition border-l-4 border-coppel-yellow' : 'hover:bg-gray-50 transition border-l-4 border-transparent';
+                const starColor = hasPrio ? 'text-coppel-yellow drop-shadow-sm' : 'text-gray-300 hover:text-gray-400';
+                
+                const starHtml = hasPrio 
+                    ? `<div class="relative inline-flex items-center justify-center w-8 h-8"><i class="fas fa-star text-3xl ${starColor}"></i><span class="absolute inset-0 flex items-center justify-center text-[11px] font-black text-yellow-900 pt-1">${c.prioridad}</span></div>`
+                    : `<div class="w-8 h-8 flex items-center justify-center"><i class="fas fa-star text-2xl ${starColor}"></i></div>`;
+
+                tbody.innerHTML += `
+                    <tr class="${rowClass}">
+                        <td class="px-4 py-3 text-center align-top pt-4"><button onclick="togglePrioridad('${c.id}')" type="button" class="transition focus:outline-none" title="Prioridad">${starHtml}</button></td>
+                        <td class="px-2 py-3 font-semibold text-coppel-blue align-top pt-4">${c.num}</td>
+                        <td class="px-4 py-3 font-medium text-gray-800 align-top pt-4">${c.nombre}</td>
+                        <td class="px-4 py-3 text-gray-600 align-top pt-4 text-xs">${c.correo}</td>
+                        <td class="px-4 py-3 text-gray-600 text-xs align-top">
+                            <div>
+                                <span class="block font-bold uppercase"><i class="fas fa-car mr-1 text-gray-400"></i>${c.placas}</span>
+                                <div class="flex items-center mt-1"><span class="block uppercase"><i class="fas fa-id-card mr-1 text-gray-400"></i>${c.tc}</span>${btnFotoHtml1}</div>
+                            </div>
+                            ${v2Html}
+                        </td>
+                        <td class="px-4 py-3 text-center align-top whitespace-nowrap pt-4">
+                            <button onclick="abrirModalEditarColaborador('${c.id}')" type="button" class="text-blue-500 hover:text-blue-700 transition mr-3" title="Editar"><i class="fas fa-edit"></i></button>
+                            <button onclick="abrirModalEliminarColaborador('${c.id}')" type="button" class="text-red-400 hover:text-red-600 transition" title="Eliminar"><i class="fas fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
+                
+                if(ulColab) {
+                    const iconPrio = hasPrio ? `★${c.prioridad} ` : '';
+                    const txt = `${iconPrio}${c.num} - ${c.nombre}`;
+                    ulColab.innerHTML += `<li onclick="seleccionarOpcion('buscar-colaborador', 'dropdown-colaboradores', '${c.num} - ${c.nombre}')" class="px-4 py-2 hover:bg-coppel-blue hover:text-white cursor-pointer border-b text-sm transition ${hasPrio ? 'font-bold text-coppel-blue bg-yellow-50' : 'text-gray-700'}">${txt}</li>`;
+                }
+            });
+            
+            if (ulColab && db.colaboradores.length !== filtrados.length) {
+                ulColab.innerHTML = '';
+                const todosOrdenados = [...db.colaboradores].sort((a,b) => (b.id - a.id));
+                todosOrdenados.forEach(c => {
+                    const iconPrio = c.prioridad > 0 ? `★${c.prioridad} ` : '';
+                    const txt = `${iconPrio}${c.num} - ${c.nombre}`;
+                    ulColab.innerHTML += `<li onclick="seleccionarOpcion('buscar-colaborador', 'dropdown-colaboradores', '${c.num} - ${c.nombre}')" class="px-4 py-2 hover:bg-coppel-blue hover:text-white cursor-pointer border-b text-sm transition ${c.prioridad > 0 ? 'font-bold text-coppel-blue bg-yellow-50' : 'text-gray-700'}">${txt}</li>`;
+                });
+            }
+        }
+
+        function registrarTarjeta() {
+            const form = document.getElementById('form-tarjeta');
+            if (!form.checkValidity()) { form.reportValidity(); return; }
+
+            const folio = document.getElementById('tarjeta-folio').value.trim();
+            if(db.tarjetas.find(t => t.folio.toLowerCase() === folio.toLowerCase())) return mostrarToast("Ese folio ya existe", "bg-red-500");
+
+            db.tarjetas.push({ id: Date.now(), folio: folio, estado: 'Disponible' });
+            guardarData();
+            form.reset();
+            mostrarToast("Tarjeta registrada", "bg-gray-800");
+        }
+
+        function renderTarjetas() {
+            const tbody = document.getElementById('lista-inventario-tarjetas');
+            const ulTarjetas = document.getElementById('dropdown-tarjetas');
+            const contador = document.getElementById('contador-tarjetas');
+            const searchVal = document.getElementById('search-tarjetas') ? document.getElementById('search-tarjetas').value.toLowerCase() : '';
+            
+            contador.innerText = `${db.tarjetas.length} Tarjetas`;
+
+            let filtrados = [...db.tarjetas].filter(t => t.folio.toLowerCase().includes(searchVal));
+            filtrados.sort((a, b) => a.folio.localeCompare(b.folio, undefined, {numeric: true}));
+
+            // EMPTY STATE 
+            if (filtrados.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" class="p-8"><div class="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-10 bg-gray-50 text-gray-400"><i class="fas ${searchVal ? 'fa-search' : 'fa-id-badge'} text-4xl mb-3 block"></i><span class="font-medium">${searchVal ? 'No hay resultados de búsqueda.' : 'No hay tarjetas registradas.'}</span></div></td></tr>`;
+            } else {
+                tbody.innerHTML = '';
+            }
+
+            if(ulTarjetas) ulTarjetas.innerHTML = '';
+            let hayDisponibles = false;
+
+            filtrados.forEach(t => {
+                const isDisponible = t.estado === 'Disponible';
+                const badgeClass = isDisponible ? 'bg-green-100 text-green-800 border-green-300' : 'bg-red-100 text-red-800 border-red-300';
+                const iconClass = isDisponible ? 'fa-check-circle' : 'fa-times-circle';
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-gray-50 transition">
+                        <td class="px-6 py-4 text-center"><span class="font-black text-gray-800 text-lg bg-gray-100 border px-4 py-1 rounded shadow-inner inline-block min-w-[100px]">${t.folio}</span></td>
+                        <td class="px-6 py-4"><span class="text-xs font-bold px-2 py-1 rounded border ${badgeClass}"><i class="fas ${iconClass} mr-1"></i>${t.estado}</span></td>
+                        <td class="px-4 py-4 text-center">
+                            ${isDisponible ? `<button onclick="abrirModalEliminarTarjeta('${t.id}')" type="button" class="text-red-400 hover:text-red-600" title="Eliminar"><i class="fas fa-trash"></i></button>` : `<span class="text-gray-300 text-xs" title="En uso"><i class="fas fa-ban"></i></span>`}
+                        </td>
+                    </tr>
+                `;
+                if(isDisponible && ulTarjetas) {
+                    ulTarjetas.innerHTML += `<li onclick="seleccionarOpcion('buscar-tarjeta', 'dropdown-tarjetas', '${t.folio}')" class="px-4 py-2 hover:bg-coppel-blue hover:text-white cursor-pointer border-b text-sm transition font-bold text-gray-700">Folio: ${t.folio}</li>`;
+                    hayDisponibles = true;
+                }
+            });
+
+            if (ulTarjetas && db.tarjetas.length !== filtrados.length) {
+                ulTarjetas.innerHTML = '';
+                hayDisponibles = false;
+                const todosOrdenados = [...db.tarjetas].sort((a,b) => a.folio.localeCompare(b.folio, undefined, {numeric: true}));
+                todosOrdenados.forEach(t => {
+                    if(t.estado === 'Disponible') {
+                        ulTarjetas.innerHTML += `<li onclick="seleccionarOpcion('buscar-tarjeta', 'dropdown-tarjetas', '${t.folio}')" class="px-4 py-2 hover:bg-coppel-blue hover:text-white cursor-pointer border-b text-sm transition font-bold text-gray-700">Folio: ${t.folio}</li>`;
+                        hayDisponibles = true;
+                    }
+                });
+            }
+
+            if(!hayDisponibles && ulTarjetas) ulTarjetas.innerHTML = `<li class="px-4 py-3 text-sm text-gray-400 text-center italic">No hay tarjetas disponibles</li>`;
+        }
+
+        function asignarPrestamo() {
+            const form = document.getElementById('form-prestamo');
+            if (!form.checkValidity()) { form.reportValidity(); return; }
+
+            const esIndefinido = document.getElementById('indefinido-switch').checked;
+            const inputColab = document.getElementById('buscar-colaborador').value.trim();
+            const inputFolio = document.getElementById('buscar-tarjeta').value.replace('Folio: ', '').trim();
+            const dias = parseInt(document.getElementById('dias-prestamo').value) || 7;
+
+            const colab = db.colaboradores.find(c => `${c.num} - ${c.nombre}` === inputColab || c.num === inputColab);
+            if(!colab) return mostrarToast("Colaborador no encontrado.", "bg-red-500");
+
+            const yaTienePrestamo = db.prestamos.some(p => String(p.id_colaborador) === String(colab.id));
+            if (yaTienePrestamo) return mostrarToast("Este colaborador ya tiene una tarjeta prestada.", "bg-red-500");
+
+            const tarjeta = db.tarjetas.find(t => t.folio.toLowerCase() === inputFolio.toLowerCase() && t.estado === 'Disponible');
+            if(!tarjeta) return mostrarToast("Tarjeta no disponible.", "bg-red-500");
+            
+            tarjeta.estado = 'Prestada';
+            
+            const inicio = new Date();
+            let finIso = null;
+            
+            if (!esIndefinido) {
+                const fin = new Date();
+                fin.setDate(fin.getDate() + dias);
+                finIso = fin.toISOString();
+            }
+
+            db.prestamos.push({
+                id: Date.now(),
+                id_colaborador: colab.id,
+                id_tarjeta: tarjeta.id,
+                fecha_inicio: inicio.toISOString(),
+                fecha_fin: finIso,
+                indefinido: esIndefinido
+            });
+            
+            guardarData();
+            form.reset();
+            document.getElementById('dias-prestamo').value = 7;
+            document.getElementById('indefinido-switch').checked = false;
+            toggleIndefinido();
+            
+            mostrarToast(`Préstamo asignado al folio ${tarjeta.folio}`, "bg-coppel-blue");
+        }
+
+        function renderPrestamos() {
+            const tbody = document.getElementById('lista-prestamos');
+            const searchVal = document.getElementById('search-prestamos') ? document.getElementById('search-prestamos').value.toLowerCase() : '';
+
+            let mapeados = db.prestamos.map(p => {
+                return { 
+                    ...p, 
+                    colabObj: db.colaboradores.find(c => String(c.id) === String(p.id_colaborador)),
+                    tarjetaObj: db.tarjetas.find(t => String(t.id) === String(p.id_tarjeta))
+                };
+            }).filter(p => p.colabObj && p.tarjetaObj);
+
+            mapeados = mapeados.filter(p => 
+                p.colabObj.nombre.toLowerCase().includes(searchVal) ||
+                p.colabObj.placas.toLowerCase().includes(searchVal) ||
+                (p.colabObj.placas_2 && p.colabObj.placas_2.toLowerCase().includes(searchVal)) ||
+                p.tarjetaObj.folio.toLowerCase().includes(searchVal)
+            );
+
+            // EMPTY STATE 
+            if (mapeados.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="p-8"><div class="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-10 bg-gray-50 text-gray-400"><i class="fas ${searchVal ? 'fa-search' : 'fa-parking'} text-4xl mb-3 block"></i><span class="font-medium">${searchVal ? 'No hay resultados de búsqueda' : 'Sin tarjetas prestadas.'}</span></div></td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = '';
+
+            mapeados.forEach(p => {
+                const colab = p.colabObj;
+                const tarjeta = p.tarjetaObj;
+
+                let badge = 'bg-blue-100 text-blue-800 border-blue-300';
+                let txtBadge = 'Sin límite';
+                let fechaTexto = 'Indefinido';
+                let filaClass = 'hover:bg-gray-50 transition border-l-4 border-transparent'; 
+                let btnAvisoHtml = ''; 
+
+                if (!p.indefinido) {
+                    const fin = new Date(p.fecha_fin);
+                    fechaTexto = fin.toLocaleDateString('es-MX');
+
+                    const hoy = new Date();
+                    hoy.setHours(0,0,0,0);
+                    const finDia = new Date(fin);
+                    finDia.setHours(0,0,0,0);
+                    const diasRestantes = Math.ceil((finDia - hoy) / 86400000);
+
+                    badge = 'bg-green-100 text-green-800 border-green-300';
+                    txtBadge = `${diasRestantes} días restantes`;
+
+                    if (diasRestantes <= 2 && diasRestantes > 0) {
+                        badge = 'bg-yellow-100 text-yellow-800 border-yellow-300';
+                    } else if (diasRestantes === 0) {
+                        badge = 'bg-orange-100 text-orange-800 border-orange-400 font-bold';
+                        txtBadge = 'Vence hoy';
+                        filaClass = 'bg-orange-50 hover:bg-orange-100 transition border-l-4 border-orange-400';
+                    } else if (diasRestantes < 0) {
+                        badge = 'bg-red-100 text-red-800 border-red-400 font-black animate-pulse shadow-sm';
+                        txtBadge = `VENCIDO (hace ${Math.abs(diasRestantes)} días)`;
+                        filaClass = 'bg-red-50 hover:bg-red-100 transition border-l-4 border-red-500 shadow-sm';
+                        
+                        if (colab.correo) {
+                            const subject = encodeURIComponent("Aviso de Devolución - Tarjeta de Estacionamiento");
+                            const body = encodeURIComponent(`Hola ${colab.nombre},\n\nTe recordamos que tu préstamo de la tarjeta de estacionamiento con el folio [ ${tarjeta.folio} ] se encuentra VENCIDA.\n\nTe pedimos de favor hacer la entrega de la misma a la brevedad para evitar inconvenientes.\n\nSaludos.`);
+                            btnAvisoHtml = `<a href="mailto:${colab.correo}?subject=${subject}&body=${body}" class="text-xs bg-white text-orange-500 border border-orange-200 px-3 py-1.5 rounded hover:bg-orange-50 transition font-bold shadow-sm mr-2" title="Enviar aviso por correo"><i class="fas fa-envelope mr-1"></i> Aviso</a>`;
+                        }
+                    }
+                }
+                
+                let textoPlacas = colab.placas.toUpperCase();
+                if (colab.placas_2) textoPlacas += ` / ${colab.placas_2.toUpperCase()}`;
+                const iconPrio = colab.prioridad > 0 ? `<i class="fas fa-star text-coppel-yellow mr-1" title="Prioridad ${colab.prioridad}"></i>` : '';
+
+                tbody.innerHTML += `
+                    <tr class="${filaClass}">
+                        <td class="px-6 py-4 text-center"><span class="font-black text-coppel-blue text-lg bg-white border px-4 py-1 rounded shadow-sm inline-block min-w-[100px] text-center">${tarjeta.folio}</span></td>
+                        <td class="px-6 py-4">
+                            <div class="font-bold text-gray-800 truncate">${iconPrio}${colab.nombre}</div>
+                            <div class="text-xs text-coppel-blue font-semibold">No. ${colab.num} <span class="text-gray-400 ml-1">| Placas: ${textoPlacas}</span></div>
+                        </td>
+                        <td class="px-4 py-4">
+                            <div class="text-sm text-gray-800 font-medium mb-1">${fechaTexto}</div>
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded border ${badge} inline-block">${p.indefinido ? '<i class="fas fa-infinity mr-1"></i>' : '<i class="fas fa-clock mr-1"></i>'} ${txtBadge}</span>
+                        </td>
+                        <td class="px-4 py-4 text-center whitespace-nowrap">
+                            ${btnAvisoHtml}
+                            <button type="button" onclick="abrirModalConfirmacion('${p.id}', '${tarjeta.id}')" class="text-xs bg-white text-red-600 border border-red-200 px-3 py-1.5 rounded hover:bg-red-50 transition font-bold shadow-sm">
+                                <i class="fas fa-undo mr-1"></i> Devolver
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function renderHistorial() {
+            const tbody = document.getElementById('lista-historial');
+            const searchVal = document.getElementById('search-historial') ? document.getElementById('search-historial').value.toLowerCase() : '';
+
+            let mapeados = db.historial.map(h => {
+                return { 
+                    ...h, 
+                    colabObj: db.colaboradores.find(c => String(c.id) === String(h.id_colaborador)) || { nombre: "Colaborador Eliminado", num: "N/A" },
+                    tarjetaObj: db.tarjetas.find(t => String(t.id) === String(h.id_tarjeta)) || { folio: "Eliminada" }
+                };
+            }).reverse();
+
+            mapeados = mapeados.filter(h => 
+                h.colabObj.nombre.toLowerCase().includes(searchVal) ||
+                h.tarjetaObj.folio.toLowerCase().includes(searchVal)
+            );
+
+            // EMPTY STATE 
+            if (mapeados.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="p-8"><div class="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-10 bg-gray-50 text-gray-400"><i class="fas ${searchVal ? 'fa-search' : 'fa-folder-open'} text-4xl mb-3 block"></i><span class="font-medium">${searchVal ? 'No hay resultados de búsqueda' : 'El historial está vacío.'}</span></div></td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = '';
+
+            mapeados.forEach(h => {
+                const colab = h.colabObj;
+                const tarjeta = h.tarjetaObj;
+                
+                const inicioStr = new Date(h.fecha_inicio).toLocaleString('es-MX', {dateStyle: 'short', timeStyle: 'short'});
+                const devueltoStr = new Date(h.fecha_devolucion_real).toLocaleString('es-MX', {dateStyle: 'short', timeStyle: 'short'});
+
+                let estadoHtml = '';
+                if(h.indefinido) {
+                    estadoHtml = `<span class="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2 py-1 rounded font-bold"><i class="fas fa-check-circle mr-1"></i>Completado (Indef.)</span>`;
+                } else {
+                    const finProgramado = new Date(h.fecha_fin);
+                    finProgramado.setHours(23,59,59,999);
+                    const devuelto = new Date(h.fecha_devolucion_real);
+                    
+                    if (devuelto <= finProgramado) {
+                        estadoHtml = `<span class="text-xs bg-green-50 text-green-700 border border-green-200 px-2 py-1 rounded font-bold"><i class="fas fa-check-circle mr-1"></i>A Tiempo</span>`;
+                    } else {
+                        estadoHtml = `<span class="text-xs bg-red-50 text-red-700 border border-red-200 px-2 py-1 rounded font-bold"><i class="fas fa-exclamation-circle mr-1"></i>Entregó Tarde</span>`;
+                    }
+                }
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-gray-50 transition border-l-4 border-purple-500">
+                        <td class="px-6 py-4 text-center font-black text-gray-700 text-lg bg-gray-50">${tarjeta.folio}</td>
+                        <td class="px-6 py-4">
+                            <div class="font-bold text-gray-800">${colab.nombre}</div>
+                            <div class="text-xs text-gray-500 font-semibold">No. ${colab.num}</div>
+                        </td>
+                        <td class="px-4 py-4 text-sm text-gray-600">${inicioStr}</td>
+                        <td class="px-4 py-4 text-sm font-bold text-gray-800">${devueltoStr}</td>
+                        <td class="px-4 py-4 text-center">${estadoHtml}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        function actualizarInterfazGeneral() {
+            renderColaboradores();
+            renderTarjetas();
+            renderPrestamos();
+            renderHistorial();
+            actualizarDashboard();
+        }
+
+        function mostrarToast(msg, bg) {
+            const t = document.getElementById('toast');
+            t.className = `fixed bottom-5 right-5 text-white px-6 py-3 rounded shadow-lg transition-opacity duration-300 z-50 ${bg}`;
+            document.getElementById('toast-msg').innerText = msg;
+            t.classList.remove('hidden', 'opacity-0');
+            setTimeout(() => {
+                t.classList.add('opacity-0');
+                setTimeout(() => t.classList.add('hidden'), 300);
+            }, 3000);
+        }
+
+        init();
+    </script>
+</body>
+</html>
+
+							<script>
+                            	
+							</script>
+                        </body>
+                        </html>
+                    
