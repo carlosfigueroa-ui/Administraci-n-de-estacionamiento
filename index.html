@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Carpool - Coppel</title>
+    
+    <!-- FAVICON OFICIAL DE COPPEL -->
+    <link rel="icon" href="https://www.coppel.com/favicon.ico" type="image/x-icon">
+
     <!-- Tailwind y FontAwesome -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -29,13 +33,11 @@
 </head>
 <body class="bg-gray-100 min-h-screen font-sans relative">
     
-    <!-- ============================================== -->
-    <!-- PANTALLA DE CARGA Y SINCRONIZACIÓN NUBE        -->
-    <!-- ============================================== -->
+    <!-- PANTALLA DE CARGA -->
     <div id="loading-overlay" class="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center transition-opacity duration-500">
         <i class="fas fa-circle-notch fa-spin text-coppel-blue text-6xl mb-4"></i>
         <h2 class="text-2xl font-bold text-gray-800">Sincronizando con la nube...</h2>
-        <p class="text-gray-500 mt-2">Conectando con Google Drive Corporativo</p>
+        <p class="text-gray-500 mt-2">Conectando con base de datos segura</p>
     </div>
 
     <!-- Encabezado -->
@@ -141,9 +143,8 @@
                     </form>
                 </div>
                 
-                <!-- DERECHA: TABLA SCROLLEABLE -->
+                <!-- DERECHA: TABLA SCROLLEABLE DE PRÉSTAMOS ACTIVOS CON MINI DASHBOARD -->
                 <div class="lg:w-2/3 bg-white p-6 rounded-lg shadow-md flex flex-col h-fit">
-                    
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-4 gap-4">
                         <div>
                             <h2 class="text-xl font-bold mb-2">Tarjetas Prestadas Activas</h2>
@@ -239,6 +240,7 @@
                     <div class="flex justify-between items-center mb-4">
                         <h2 class="text-xl font-bold">Base de Datos - Colaboradores</h2>
                         <div class="flex items-center gap-3">
+                            <!-- BUSCADOR -->
                             <div class="relative w-full sm:w-56">
                                 <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400"><i class="fas fa-search"></i></span>
                                 <input type="text" id="search-colaboradores" oninput="renderColaboradores()" placeholder="Buscar empleado..." class="w-full border border-gray-300 rounded-full py-1.5 pl-9 pr-3 text-sm focus:outline-none focus:border-coppel-blue bg-gray-50">
@@ -256,7 +258,8 @@
                                 <tr>
                                     <th class="px-4 py-3 font-bold text-gray-700 w-12 text-center" title="Prioridad en cola">Cola</th>
                                     <th class="px-2 py-3 font-bold text-gray-700">No. Emp</th>
-                                    <th class="px-4 py-3 font-bold text-gray-700">Nombre Completo</th>
+                                    <!-- AQUI CORREGÍ EL ENCABEZADO A Nombre / Correo -->
+                                    <th class="px-4 py-3 font-bold text-gray-700">Nombre / Correo</th>
                                     <th class="px-4 py-3 font-bold text-gray-700">Placas / TC</th>
                                     <th class="px-4 py-3 font-bold text-gray-700 text-center">Acción</th>
                                 </tr>
@@ -356,10 +359,7 @@
                 <div class="bg-blue-100 text-coppel-blue rounded-full p-2 mr-3"><i class="fas fa-undo-alt text-xl"></i></div>
                 <h3 class="text-xl font-bold text-gray-900">Confirmar Devolución</h3>
             </div>
-            <p class="text-sm text-gray-600 mb-6 leading-relaxed">
-                ¿Estás seguro de que deseas procesar la devolución? <br><br>
-                El registro se enviará al <b>Historial</b> y el Folio volverá a estar disponible.
-            </p>
+            <p class="text-sm text-gray-600 mb-6 leading-relaxed">¿Estás seguro de que deseas procesar la devolución? <br><br>El registro se enviará al <b>Historial</b> y el Folio volverá a estar disponible.</p>
             <div class="flex justify-end gap-3">
                 <button onclick="cerrarModalConfirmacion()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded shadow-sm hover:bg-gray-200 font-bold text-sm transition">Cancelar</button>
                 <button onclick="procesarDevolucionConfirmada()" class="px-4 py-2 bg-coppel-blue text-white rounded shadow-sm hover:bg-blue-800 font-bold text-sm transition flex items-center">
@@ -457,67 +457,35 @@
 
     <!-- SCRIPT PRINCIPAL -->
     <script>
-        // URL DE TU BASE DE DATOS EN LA NUBE (GOOGLE DRIVE)
         const URL_GOOGLE_SCRIPT = "https://script.google.com/a/macros/coppel.com/s/AKfycbyQibnCGK663j5e04Uvj-Ks77ko-X2OL56-7BL7gZY1nppbdEVZaH3J2clpAinD5mag/exec";
         
         let db = { colaboradores: [], tarjetas: [], prestamos: [], historial: [] };
-        
-        let idPrestamoPendiente = null;
-        let idTarjetaPendiente = null;
-        let idTarjetaEliminarPendiente = null;
-        let idColaboradorEliminarPendiente = null;
-        let idColaboradorParaFoto = null;
-        let indiceVehiculoParaFoto = 1;
-        let idColaboradorEdicion = null;
+        let idPrestamoPendiente = null, idTarjetaPendiente = null, idTarjetaEliminarPendiente = null, idColaboradorEliminarPendiente = null, idColaboradorParaFoto = null, indiceVehiculoParaFoto = 1, idColaboradorEdicion = null;
 
-        // INICIALIZACIÓN: Carga los datos de Google Script y si falla usa la memoria local
         async function init() {
             try {
-                // Intentar cargar la base de datos desde Google Drive
                 const response = await fetch(URL_GOOGLE_SCRIPT);
                 if(response.ok) {
                     const cloudData = await response.json();
                     if(cloudData && cloudData.colaboradores) {
                         db = cloudData;
-                        // Actualizar la copia de seguridad local
                         localStorage.setItem('coppel_carpool_db', JSON.stringify(db));
                     }
                 }
             } catch (e) {
-                console.warn("No se pudo conectar a la nube. Usando respaldo local.", e);
                 const dataGuardada = localStorage.getItem('coppel_carpool_db');
                 if (dataGuardada) db = JSON.parse(dataGuardada);
             }
-            
-            // Validar que todas las propiedades existan
-            if(!db.colaboradores) db.colaboradores = [];
-            if(!db.tarjetas) db.tarjetas = [];
-            if(!db.prestamos) db.prestamos = [];
-            if(!db.historial) db.historial = [];
-
+            if(!db.colaboradores) db.colaboradores = []; if(!db.tarjetas) db.tarjetas = []; if(!db.prestamos) db.prestamos = []; if(!db.historial) db.historial = [];
             actualizarInterfazGeneral();
-
-            // Ocultar pantalla de carga
             const overlay = document.getElementById('loading-overlay');
-            if(overlay) {
-                overlay.classList.add('opacity-0');
-                setTimeout(() => overlay.classList.add('hidden'), 500);
-            }
+            if(overlay) { overlay.classList.add('opacity-0'); setTimeout(() => overlay.classList.add('hidden'), 500); }
         }
 
-        // GUARDADO: Guarda localmente para que la pantalla sea rápida, y envía a la nube por detrás
         function guardarData() {
-            // Guardar local (pantalla inmediata)
-            try { localStorage.setItem('coppel_carpool_db', JSON.stringify(db)); } catch (e) { }
+            try { localStorage.setItem('coppel_carpool_db', JSON.stringify(db)); } catch (e) {}
             actualizarInterfazGeneral();
-
-            // Enviar a la nube (Google Drive) silenciosamente
-            fetch(URL_GOOGLE_SCRIPT, {
-                method: 'POST',
-                mode: 'no-cors', // Evita bloqueos de seguridad del navegador
-                headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify(db)
-            }).catch(err => console.error("Error sincronizando en la nube:", err));
+            fetch(URL_GOOGLE_SCRIPT, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(db) });
         }
 
         function procesarRestauracionBD(e) {
@@ -528,11 +496,9 @@
                 try {
                     const dbRestaurada = JSON.parse(evento.target.result);
                     if(dbRestaurada.colaboradores && dbRestaurada.tarjetas) {
-                        db = dbRestaurada;
-                        guardarData(); // Esto actualizará local y NUBE
-                        mostrarToast("Base de datos restaurada con éxito", "bg-green-500");
+                        db = dbRestaurada; guardarData(); mostrarToast("BD restaurada", "bg-green-500");
                     } else throw new Error("Formato incorrecto");
-                } catch (error) { alert("Error al leer el archivo. Asegúrate de que sea un JSON válido."); }
+                } catch (error) { alert("Error al leer el JSON."); }
                 document.getElementById('input-restaurar-bd').value = '';
             };
             reader.readAsText(file);
@@ -540,823 +506,311 @@
 
         function actualizarDashboard() {
             document.getElementById('dash-total').innerText = db.tarjetas.length;
-            const disponibles = db.tarjetas.filter(t => t.estado === 'Disponible').length;
-            document.getElementById('dash-disponibles').innerText = disponibles;
+            document.getElementById('dash-disponibles').innerText = db.tarjetas.filter(t => t.estado === 'Disponible').length;
             document.getElementById('dash-prestadas').innerText = db.prestamos.length;
-            
-            let vencidas = 0;
-            const hoy = new Date();
-            hoy.setHours(0,0,0,0);
-            db.prestamos.forEach(p => {
-                if(!p.indefinido) {
-                    const fin = new Date(p.fecha_fin);
-                    fin.setHours(0,0,0,0);
-                    if (fin < hoy) vencidas++;
-                }
-            });
+            let vencidas = 0; const hoy = new Date(); hoy.setHours(0,0,0,0);
+            db.prestamos.forEach(p => { if(!p.indefinido) { const fin = new Date(p.fecha_fin); fin.setHours(0,0,0,0); if (fin < hoy) vencidas++; } });
             document.getElementById('dash-vencidas').innerText = vencidas;
         }
 
         function descargarRespaldoJSON() {
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db, null, 2));
             const dlAnchorElem = document.createElement('a');
-            dlAnchorElem.setAttribute("href", dataStr);
-            dlAnchorElem.setAttribute("download", "Respaldo_Carpool_" + new Date().toISOString().split('T')[0] + ".json");
-            dlAnchorElem.click();
+            dlAnchorElem.setAttribute("href", dataStr); dlAnchorElem.setAttribute("download", "Respaldo_Carpool.json"); dlAnchorElem.click();
             mostrarToast("Base de datos respaldada", "bg-green-500");
         }
 
         function toggleIndefinido() {
             const input = document.getElementById('dias-prestamo');
-            const isChecked = document.getElementById('indefinido-switch').checked;
-            if(isChecked) {
-                input.disabled = true;
-                input.value = '';
-                input.classList.add('bg-gray-100', 'cursor-not-allowed');
-                input.removeAttribute('required');
+            if(document.getElementById('indefinido-switch').checked) {
+                input.disabled = true; input.value = ''; input.classList.add('bg-gray-100', 'cursor-not-allowed'); input.removeAttribute('required');
             } else {
-                input.disabled = false;
-                input.value = '7';
-                input.classList.remove('bg-gray-100', 'cursor-not-allowed');
-                input.setAttribute('required', 'required');
+                input.disabled = false; input.value = '7'; input.classList.remove('bg-gray-100', 'cursor-not-allowed'); input.setAttribute('required', 'required');
             }
         }
 
         function toggleVehiculoExtra() {
-            const container = document.getElementById('vehiculo-extra-container');
-            const btn = document.getElementById('btn-mostrar-v2');
-            if (container.classList.contains('hidden')) {
-                container.classList.remove('hidden');
-                btn.classList.add('hidden');
-            } else {
-                container.classList.add('hidden');
-                btn.classList.remove('hidden');
-                document.getElementById('colab-placas-2').value = '';
-                document.getElementById('colab-tc-2').value = '';
-                document.getElementById('colab-foto-tc-2').value = '';
-            }
+            const container = document.getElementById('vehiculo-extra-container'), btn = document.getElementById('btn-mostrar-v2');
+            if (container.classList.contains('hidden')) { container.classList.remove('hidden'); btn.classList.add('hidden'); } 
+            else { container.classList.add('hidden'); btn.classList.remove('hidden'); document.getElementById('colab-placas-2').value = ''; document.getElementById('colab-tc-2').value = ''; document.getElementById('colab-foto-tc-2').value = ''; }
         }
 
-        function toggleCustomDropdown(dropdownId) {
-            cerrarDropdowns(dropdownId);
-            const dropdown = document.getElementById(dropdownId);
-            if (dropdown) {
-                dropdown.classList.toggle('hidden');
-                if(!dropdown.classList.contains('hidden')) {
-                    const items = dropdown.getElementsByTagName('li');
-                    for (let i = 0; i < items.length; i++) items[i].style.display = "";
-                }
-            }
+        function toggleCustomDropdown(id) {
+            cerrarDropdowns(id); const dropdown = document.getElementById(id);
+            if (dropdown) { dropdown.classList.toggle('hidden'); if(!dropdown.classList.contains('hidden')) { const items = dropdown.getElementsByTagName('li'); for (let i=0; i<items.length; i++) items[i].style.display = ""; } }
         }
 
-        function cerrarDropdowns(exceptoId = null) {
-            ['dropdown-colaboradores', 'dropdown-tarjetas'].forEach(id => {
-                if (id !== exceptoId) {
-                    const drop = document.getElementById(id);
-                    if (drop) drop.classList.add('hidden');
-                }
-            });
-        }
-
-        document.addEventListener('click', function(e) {
-            if (!e.target.closest('.dropdown-container')) cerrarDropdowns();
-        });
-
-        function seleccionarOpcion(inputId, dropdownId, valor) {
-            document.getElementById(inputId).value = valor;
-            cerrarDropdowns();
-        }
-
-        function filtrarDropdown(inputId, dropdownId) {
-            const filtro = document.getElementById(inputId).value.toLowerCase();
-            const dropdown = document.getElementById(dropdownId);
-            dropdown.classList.remove('hidden');
-            
-            const items = dropdown.getElementsByTagName('li');
-            for (let i = 0; i < items.length; i++) {
-                const texto = items[i].innerText.toLowerCase();
-                if (texto.includes(filtro)) items[i].style.display = "";
-                else items[i].style.display = "none";
-            }
-        }
-
-        function cambiarPestana(idActiva) {
-            document.querySelectorAll('.pestana-contenido').forEach(p => p.classList.add('hidden'));
-            document.getElementById(idActiva).classList.remove('hidden');
-            
-            ['btn-prestamos', 'btn-colaboradores', 'btn-tarjetas', 'btn-historial'].forEach(b => {
-                const btn = document.getElementById(b);
-                btn.classList.remove('border-l', 'border-t', 'border-r', 'rounded-t', 'text-coppel-blue');
-                btn.classList.add('text-gray-500');
-            });
-            
-            const btnActivo = document.getElementById(`btn-${idActiva.split('-')[1]}`);
-            btnActivo.classList.add('border-l', 'border-t', 'border-r', 'rounded-t', 'text-coppel-blue');
-            btnActivo.classList.remove('text-gray-500');
-        }
-
-        function abrirModalConfirmacion(idPrestamo, idTarjeta) {
-            idPrestamoPendiente = idPrestamo;
-            idTarjetaPendiente = idTarjeta;
-            const modal = document.getElementById('modal-confirmacion');
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-        }
-        function cerrarModalConfirmacion() {
-            idPrestamoPendiente = null;
-            idTarjetaPendiente = null;
-            const modal = document.getElementById('modal-confirmacion');
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
-        }
+        function cerrarDropdowns(exc = null) { ['dropdown-colaboradores', 'dropdown-tarjetas'].forEach(id => { if (id !== exc) { const d = document.getElementById(id); if (d) d.classList.add('hidden'); } }); }
+        document.addEventListener('click', e => { if (!e.target.closest('.dropdown-container')) cerrarDropdowns(); });
+        function seleccionarOpcion(inp, drop, val) { document.getElementById(inp).value = val; cerrarDropdowns(); }
         
+        function filtrarDropdown(inp, drop) {
+            const f = document.getElementById(inp).value.toLowerCase(), dropdown = document.getElementById(drop);
+            dropdown.classList.remove('hidden');
+            const items = dropdown.getElementsByTagName('li');
+            for (let i = 0; i < items.length; i++) items[i].style.display = items[i].innerText.toLowerCase().includes(f) ? "" : "none";
+        }
+
+        function cambiarPestana(id) {
+            document.querySelectorAll('.pestana-contenido').forEach(p => p.classList.add('hidden')); document.getElementById(id).classList.remove('hidden');
+            ['btn-prestamos', 'btn-colaboradores', 'btn-tarjetas', 'btn-historial'].forEach(b => {
+                const btn = document.getElementById(b); btn.classList.remove('border-l', 'border-t', 'border-r', 'rounded-t', 'text-coppel-blue'); btn.classList.add('text-gray-500');
+            });
+            const btnActivo = document.getElementById(`btn-${id.split('-')[1]}`);
+            btnActivo.classList.add('border-l', 'border-t', 'border-r', 'rounded-t', 'text-coppel-blue'); btnActivo.classList.remove('text-gray-500');
+        }
+
+        function abrirModalConfirmacion(id1, id2) { idPrestamoPendiente = id1; idTarjetaPendiente = id2; document.getElementById('modal-confirmacion').classList.replace('hidden','flex'); }
+        function cerrarModalConfirmacion() { idPrestamoPendiente = null; idTarjetaPendiente = null; document.getElementById('modal-confirmacion').classList.replace('flex','hidden'); }
         function procesarDevolucionConfirmada() {
-            if (!idPrestamoPendiente || !idTarjetaPendiente) return;
-            
-            const prestamoIndex = db.prestamos.findIndex(p => String(p.id) === String(idPrestamoPendiente));
-            if (prestamoIndex !== -1) {
-                const prestamo = db.prestamos[prestamoIndex];
-                db.historial.push({ ...prestamo, fecha_devolucion_real: new Date().toISOString() });
-
-                const tarjetaEncontrada = db.tarjetas.find(t => String(t.id) === String(idTarjetaPendiente));
-                if (tarjetaEncontrada) tarjetaEncontrada.estado = 'Disponible';
-                
-                db.prestamos.splice(prestamoIndex, 1);
+            if (!idPrestamoPendiente) return;
+            const idx = db.prestamos.findIndex(p => String(p.id) === String(idPrestamoPendiente));
+            if (idx !== -1) {
+                db.historial.push({ ...db.prestamos[idx], fecha_devolucion_real: new Date().toISOString() });
+                const tj = db.tarjetas.find(t => String(t.id) === String(idTarjetaPendiente));
+                if (tj) tj.estado = 'Disponible';
+                db.prestamos.splice(idx, 1);
             }
-            guardarData();
-            cerrarModalConfirmacion();
-            mostrarToast("Devolución procesada y guardada en el Historial.", "bg-green-500");
+            guardarData(); cerrarModalConfirmacion(); mostrarToast("Devuelto al historial", "bg-green-500");
         }
 
-        function abrirModalEliminarTarjeta(id) {
-            if (db.prestamos.find(p => String(p.id_tarjeta) === String(id))) {
-                mostrarToast('No puedes eliminar esta tarjeta porque está en uso actualmente.', 'bg-red-500');
-                return;
-            }
-            idTarjetaEliminarPendiente = id;
-            const modal = document.getElementById('modal-eliminar-tarjeta');
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-        }
-        function cerrarModalEliminarTarjeta() {
-            idTarjetaEliminarPendiente = null;
-            const modal = document.getElementById('modal-eliminar-tarjeta');
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
-        }
-        function procesarEliminarTarjetaConfirmada() {
-            if (!idTarjetaEliminarPendiente) return;
-            db.tarjetas = db.tarjetas.filter(t => String(t.id) !== String(idTarjetaEliminarPendiente));
-            guardarData();
-            cerrarModalEliminarTarjeta();
-            mostrarToast("Tarjeta eliminada permanentemente.", "bg-gray-600");
-        }
+        function abrirModalEliminarTarjeta(id) { if (db.prestamos.find(p => String(p.id_tarjeta) === String(id))) return mostrarToast('Tarjeta en uso', 'bg-red-500'); idTarjetaEliminarPendiente = id; document.getElementById('modal-eliminar-tarjeta').classList.replace('hidden','flex'); }
+        function cerrarModalEliminarTarjeta() { document.getElementById('modal-eliminar-tarjeta').classList.replace('flex','hidden'); }
+        function procesarEliminarTarjetaConfirmada() { db.tarjetas = db.tarjetas.filter(t => String(t.id) !== String(idTarjetaEliminarPendiente)); guardarData(); cerrarModalEliminarTarjeta(); mostrarToast("Eliminada", "bg-gray-600"); }
 
-        function abrirModalEliminarColaborador(id) {
-            if (db.prestamos.find(p => String(p.id_colaborador) === String(id))) {
-                mostrarToast('No puedes eliminar a este colaborador porque tiene una tarjeta prestada.', 'bg-red-500');
-                return;
-            }
-            idColaboradorEliminarPendiente = id;
-            const modal = document.getElementById('modal-eliminar-colaborador');
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-        }
-        function cerrarModalEliminarColaborador() {
-            idColaboradorEliminarPendiente = null;
-            const modal = document.getElementById('modal-eliminar-colaborador');
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
-        }
+        function abrirModalEliminarColaborador(id) { if (db.prestamos.find(p => String(p.id_colaborador) === String(id))) return mostrarToast('Tiene tarjeta prestada', 'bg-red-500'); idColaboradorEliminarPendiente = id; document.getElementById('modal-eliminar-colaborador').classList.replace('hidden','flex'); }
+        function cerrarModalEliminarColaborador() { document.getElementById('modal-eliminar-colaborador').classList.replace('flex','hidden'); }
         function procesarEliminarColaboradorConfirmado() {
-            if (!idColaboradorEliminarPendiente) return;
             const colab = db.colaboradores.find(c => String(c.id) === String(idColaboradorEliminarPendiente));
-            if (colab && colab.prioridad > 0) {
-                const prioAntigua = colab.prioridad;
-                db.colaboradores.forEach(c => { if (c.prioridad > prioAntigua) c.prioridad -= 1; });
-            }
+            if (colab && colab.prioridad > 0) db.colaboradores.forEach(c => { if (c.prioridad > colab.prioridad) c.prioridad -= 1; });
             db.colaboradores = db.colaboradores.filter(c => String(c.id) !== String(idColaboradorEliminarPendiente));
-            guardarData();
-            cerrarModalEliminarColaborador();
-            mostrarToast("Colaborador eliminado del sistema.", "bg-gray-600");
+            guardarData(); cerrarModalEliminarColaborador(); mostrarToast("Eliminado", "bg-gray-600");
         }
 
-        function verFotoTC(idColaborador, vehiculoIndex) {
-            const colab = db.colaboradores.find(c => String(c.id) === String(idColaborador));
-            if(colab) {
-                const foto = vehiculoIndex === 1 ? colab.foto_tc : colab.foto_tc_2;
-                if(foto) {
-                    document.getElementById('img-visor-tc').src = foto;
-                    const modal = document.getElementById('modal-ver-foto');
-                    modal.classList.remove('hidden');
-                    modal.classList.add('flex');
-                }
-            }
-        }
-        function cerrarModalFoto() {
-            const modal = document.getElementById('modal-ver-foto');
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
-            document.getElementById('img-visor-tc').src = "";
-        }
+        function verFotoTC(id, v) { const c = db.colaboradores.find(x => String(x.id) === String(id)); if(c) { const f = v===1?c.foto_tc:c.foto_tc_2; if(f){ document.getElementById('img-visor-tc').src = f; document.getElementById('modal-ver-foto').classList.replace('hidden','flex'); } } }
+        function cerrarModalFoto() { document.getElementById('modal-ver-foto').classList.replace('flex','hidden'); document.getElementById('img-visor-tc').src = ""; }
 
-        function abrirCargaFoto(id, vehiculoIndex) {
-            idColaboradorParaFoto = id;
-            indiceVehiculoParaFoto = vehiculoIndex;
-            document.getElementById('input-foto-individual').click();
-        }
-
+        function abrirCargaFoto(id, v) { idColaboradorParaFoto = id; indiceVehiculoParaFoto = v; document.getElementById('input-foto-individual').click(); }
         async function subirFotoIndividual(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            if (file.size > 2 * 1024 * 1024) { 
-                mostrarToast("La imagen es muy pesada (Máx 2MB)", "bg-red-500");
-                e.target.value = '';
-                return;
-            }
-            try {
-                const fotoBase64 = await convertirABase64(file);
-                const colab = db.colaboradores.find(c => String(c.id) === String(idColaboradorParaFoto));
-                if (colab) {
-                    if (indiceVehiculoParaFoto === 1) colab.foto_tc = fotoBase64;
-                    else colab.foto_tc_2 = fotoBase64;
-                    guardarData();
-                    mostrarToast("Foto guardada correctamente", "bg-green-500");
-                }
-            } catch (error) { mostrarToast("Error al cargar la imagen", "bg-red-500"); }
-            e.target.value = '';
+            const f = e.target.files[0]; if(!f) return;
+            if (f.size > 2*1024*1024) return mostrarToast("Muy pesada", "bg-red-500");
+            try { const b64 = await convertirABase64(f); const c = db.colaboradores.find(x => String(x.id) === String(idColaboradorParaFoto)); if(c){ if(indiceVehiculoParaFoto===1) c.foto_tc=b64; else c.foto_tc_2=b64; guardarData(); mostrarToast("Guardada", "bg-green-500"); } } catch(err){}
+            e.target.value='';
         }
 
         function abrirModalEditarColaborador(id) {
-            const colab = db.colaboradores.find(c => String(c.id) === String(id));
-            if(!colab) return;
+            const colab = db.colaboradores.find(c => String(c.id) === String(id)); if(!colab) return;
             idColaboradorEdicion = id;
-
-            document.getElementById('edit-colab-num').value = colab.num;
-            document.getElementById('edit-colab-nombre').value = colab.nombre;
-            document.getElementById('edit-colab-correo').value = colab.correo;
-            document.getElementById('edit-colab-placas').value = colab.placas;
-            document.getElementById('edit-colab-tc').value = colab.tc;
-            document.getElementById('edit-colab-placas-2').value = colab.placas_2 || '';
-            document.getElementById('edit-colab-tc-2').value = colab.tc_2 || '';
-            document.getElementById('edit-colab-foto-tc').value = '';
-            document.getElementById('edit-colab-foto-tc-2').value = '';
-
-            const modal = document.getElementById('modal-editar-colaborador');
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
+            document.getElementById('edit-colab-num').value = colab.num; document.getElementById('edit-colab-nombre').value = colab.nombre; document.getElementById('edit-colab-correo').value = colab.correo;
+            document.getElementById('edit-colab-placas').value = colab.placas; document.getElementById('edit-colab-tc').value = colab.tc;
+            document.getElementById('edit-colab-placas-2').value = colab.placas_2||''; document.getElementById('edit-colab-tc-2').value = colab.tc_2||'';
+            document.getElementById('modal-editar-colaborador').classList.replace('hidden','flex');
         }
-
-        function cerrarModalEditarColaborador() {
-            idColaboradorEdicion = null;
-            const modal = document.getElementById('modal-editar-colaborador');
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
-        }
-
+        function cerrarModalEditarColaborador() { document.getElementById('modal-editar-colaborador').classList.replace('flex','hidden'); }
         async function guardarEdicionColaborador() {
-            if (!idColaboradorEdicion) return;
+            const form = document.getElementById('form-editar-colaborador'); if(!form.checkValidity()){ form.reportValidity(); return; }
+            const num = document.getElementById('edit-colab-num').value.trim(), colab = db.colaboradores.find(c => String(c.id) === String(idColaboradorEdicion));
+            if(db.colaboradores.find(c => c.num === num && String(c.id) !== String(idColaboradorEdicion))) return mostrarToast("Ya existe", "bg-red-500");
+            
+            let f1 = colab.foto_tc, f2 = colab.foto_tc_2;
+            const a1 = document.getElementById('edit-colab-foto-tc').files[0], a2 = document.getElementById('edit-colab-foto-tc-2').files[0];
+            if(a1) { if(a1.size>2097152) return mostrarToast("V1 muy pesada", "bg-red-500"); try{ f1 = await convertirABase64(a1); }catch(e){} }
+            if(a2) { if(a2.size>2097152) return mostrarToast("V2 muy pesada", "bg-red-500"); try{ f2 = await convertirABase64(a2); }catch(e){} }
 
-            const form = document.getElementById('form-editar-colaborador');
-            if (!form.checkValidity()) { form.reportValidity(); return; }
-
-            const num = document.getElementById('edit-colab-num').value.trim();
-            const nombre = document.getElementById('edit-colab-nombre').value.trim();
-            const correo = document.getElementById('edit-colab-correo').value.trim();
-            const placas = document.getElementById('edit-colab-placas').value.trim();
-            const tc = document.getElementById('edit-colab-tc').value.trim();
-            const placas_2 = document.getElementById('edit-colab-placas-2').value.trim();
-            const tc_2 = document.getElementById('edit-colab-tc-2').value.trim();
-
-            const existe = db.colaboradores.find(c => c.num === num && String(c.id) !== String(idColaboradorEdicion));
-            if(existe) return mostrarToast("Ese número de empleado ya pertenece a otro registro", "bg-red-500");
-
-            const colab = db.colaboradores.find(c => String(c.id) === String(idColaboradorEdicion));
-            if(!colab) return;
-
-            let foto1 = colab.foto_tc;
-            let foto2 = colab.foto_tc_2;
-
-            const file1 = document.getElementById('edit-colab-foto-tc').files[0];
-            const file2 = document.getElementById('edit-colab-foto-tc-2').files[0];
-
-            if(file1) {
-                if(file1.size > 2 * 1024 * 1024) return mostrarToast("Imagen V1 muy pesada", "bg-red-500");
-                try { foto1 = await convertirABase64(file1); } catch(e) {}
-            }
-            if(file2) {
-                if(file2.size > 2 * 1024 * 1024) return mostrarToast("Imagen V2 muy pesada", "bg-red-500");
-                try { foto2 = await convertirABase64(file2); } catch(e) {}
-            }
-
-            colab.num = num;
-            colab.nombre = nombre;
-            colab.correo = correo;
-            colab.placas = placas;
-            colab.tc = tc;
-            colab.foto_tc = foto1;
-
-            if (placas_2) {
-                colab.placas_2 = placas_2;
-                colab.tc_2 = tc_2;
-                colab.foto_tc_2 = foto2;
-            } else {
-                colab.placas_2 = null;
-                colab.tc_2 = null;
-                colab.foto_tc_2 = null;
-            }
-
-            guardarData();
-            cerrarModalEditarColaborador();
-            mostrarToast("Registro actualizado correctamente", "bg-blue-500");
+            colab.num = num; colab.nombre = document.getElementById('edit-colab-nombre').value.trim(); colab.correo = document.getElementById('edit-colab-correo').value.trim();
+            colab.placas = document.getElementById('edit-colab-placas').value.trim(); colab.tc = document.getElementById('edit-colab-tc').value.trim(); colab.foto_tc = f1;
+            const p2 = document.getElementById('edit-colab-placas-2').value.trim();
+            if(p2) { colab.placas_2 = p2; colab.tc_2 = document.getElementById('edit-colab-tc-2').value.trim(); colab.foto_tc_2 = f2; } 
+            else { colab.placas_2=null; colab.tc_2=null; colab.foto_tc_2=null; }
+            guardarData(); cerrarModalEditarColaborador(); mostrarToast("Actualizado", "bg-blue-500");
         }
 
         function togglePrioridad(id) {
-            const colab = db.colaboradores.find(c => String(c.id) === String(id));
-            if(colab) {
-                if (colab.prioridad > 0) {
-                    const prioAntigua = colab.prioridad;
-                    colab.prioridad = 0;
-                    db.colaboradores.forEach(c => { if (c.prioridad > prioAntigua) c.prioridad -= 1; });
-                } else {
-                    const maxPrio = db.colaboradores.reduce((max, c) => Math.max(max, c.prioridad || 0), 0);
-                    colab.prioridad = maxPrio + 1;
-                }
-                guardarData();
-            }
+            const c = db.colaboradores.find(x => String(x.id) === String(id));
+            if(c){ if(c.prioridad > 0){ const old = c.prioridad; c.prioridad=0; db.colaboradores.forEach(x => { if(x.prioridad>old) x.prioridad-=1; }); } else { c.prioridad = db.colaboradores.reduce((m,x)=>Math.max(m,x.prioridad||0),0)+1; } guardarData(); }
         }
 
         function exportarExcelColaboradores() {
-            if (db.colaboradores.length === 0) return mostrarToast("No hay datos para exportar", "bg-yellow-500");
-            const datosExportar = db.colaboradores.map(c => ({
-                "Prioridad (Cola)": c.prioridad > 0 ? c.prioridad : "NO",
-                "No. Empleado": c.num,
-                "Nombre Completo": c.nombre,
-                "Correo Corporativo": c.correo,
-                "Placas": c.placas,
-                "Folio TC": c.tc,
-                "Placas V2": c.placas_2 || '',
-                "Folio TC V2": c.tc_2 || ''
-            }));
-            const hoja = XLSX.utils.json_to_sheet(datosExportar);
-            const libro = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(libro, hoja, "Colaboradores");
-            XLSX.writeFile(libro, "Base_Datos_Colaboradores.xlsx");
-            mostrarToast("Archivo exportado correctamente", "bg-green-500");
+            if (db.colaboradores.length === 0) return mostrarToast("Sin datos", "bg-yellow-500");
+            const data = db.colaboradores.map(c => ({ "Prioridad": c.prioridad>0?c.prioridad:"NO", "No. Emp": c.num, "Nombre": c.nombre, "Correo": c.correo, "Placas": c.placas, "TC": c.tc, "Placas 2": c.placas_2||'', "TC 2": c.tc_2||'' }));
+            const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), "Colabs"); XLSX.writeFile(wb, "Colaboradores.xlsx");
         }
-        
-        function convertirABase64(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onload = () => resolve(reader.result);
-                reader.onerror = error => reject(error);
-            });
-        }
+        function convertirABase64(f) { return new Promise((r,rj) => { const rd = new FileReader(); rd.readAsDataURL(f); rd.onload=()=>r(rd.result); rd.onerror=e=>rj(e); }); }
 
         async function registrarColaborador() {
-            const form = document.getElementById('form-colaborador');
-            if (!form.checkValidity()) { form.reportValidity(); return; }
-
-            const num = document.getElementById('colab-num').value.trim();
-            const nombre = document.getElementById('colab-nombre').value.trim();
-            const correo = document.getElementById('colab-correo').value.trim();
+            const form = document.getElementById('form-colaborador'); if(!form.checkValidity()){ form.reportValidity(); return; }
+            const num = document.getElementById('colab-num').value.trim(); if(db.colaboradores.find(c => c.num === num)) return mostrarToast("Ya existe", "bg-red-500");
             
-            const placas = document.getElementById('colab-placas').value.trim();
-            const tc = document.getElementById('colab-tc').value.trim();
-            const fotoInput = document.getElementById('colab-foto-tc');
-            
-            const placas_2 = document.getElementById('colab-placas-2').value.trim();
-            const tc_2 = document.getElementById('colab-tc-2').value.trim();
-            const fotoInput_2 = document.getElementById('colab-foto-tc-2');
+            let f1 = null, f2 = null;
+            const a1 = document.getElementById('colab-foto-tc').files[0], a2 = document.getElementById('colab-foto-tc-2').files[0];
+            if(a1) { if(a1.size>2097152) return mostrarToast("V1 pesada", "bg-red-500"); try{ f1 = await convertirABase64(a1); }catch(e){} }
+            if(a2) { if(a2.size>2097152) return mostrarToast("V2 pesada", "bg-red-500"); try{ f2 = await convertirABase64(a2); }catch(e){} }
 
-            if(db.colaboradores.find(c => c.num === num)) return mostrarToast("Este número de colaborador ya existe", "bg-red-500");
-            
-            let fotoBase64 = null;
-            if(fotoInput.files && fotoInput.files[0]) {
-                if(fotoInput.files[0].size > 2 * 1024 * 1024) return mostrarToast("Imagen V1 muy pesada (Máx 2MB)", "bg-red-500");
-                try { fotoBase64 = await convertirABase64(fotoInput.files[0]); } catch(e) {}
-            }
-
-            let fotoBase64_2 = null;
-            if(fotoInput_2.files && fotoInput_2.files[0]) {
-                if(fotoInput_2.files[0].size > 2 * 1024 * 1024) return mostrarToast("Imagen V2 muy pesada (Máx 2MB)", "bg-red-500");
-                try { fotoBase64_2 = await convertirABase64(fotoInput_2.files[0]); } catch(e) {}
-            }
-
-            db.colaboradores.push({ 
-                id: Date.now(), num, nombre, correo, 
-                placas, tc, foto_tc: fotoBase64,
-                placas_2, tc_2, foto_tc_2: fotoBase64_2,
-                prioridad: 0 
-            });
-            
-            guardarData();
-            form.reset();
-            document.getElementById('vehiculo-extra-container').classList.add('hidden');
-            document.getElementById('btn-mostrar-v2').classList.remove('hidden');
-            mostrarToast("Colaborador guardado exitosamente", "bg-green-500");
+            db.colaboradores.push({ id: Date.now(), num, nombre: document.getElementById('colab-nombre').value.trim(), correo: document.getElementById('colab-correo').value.trim(), placas: document.getElementById('colab-placas').value.trim(), tc: document.getElementById('colab-tc').value.trim(), foto_tc: f1, placas_2: document.getElementById('colab-placas-2').value.trim(), tc_2: document.getElementById('colab-tc-2').value.trim(), foto_tc_2: f2, prioridad: 0 });
+            guardarData(); form.reset(); document.getElementById('vehiculo-extra-container').classList.add('hidden'); document.getElementById('btn-mostrar-v2').classList.remove('hidden'); mostrarToast("Guardado", "bg-green-500");
         }
 
         function procesarExcel(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = function(evento) {
+            const f = e.target.files[0]; if(!f) return;
+            const r = new FileReader(); r.onload = ev => {
                 try {
-                    const data = new Uint8Array(evento.target.result);
-                    const workbook = XLSX.read(data, {type: 'array'});
-                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                    const filasJSON = XLSX.utils.sheet_to_json(worksheet, {header: 1});
-
-                    let agregados = 0; let duplicados = 0;
-
-                    for(let i = 1; i < filasJSON.length; i++) {
-                        const row = filasJSON[i];
-                        if (row.length === 0 || !row[0]) continue; 
-
-                        const num = String(row[0]).trim();
-                        const nombre = String(row[1] || '').trim();
-                        const correo = String(row[2] || '').trim();
-                        const placas = String(row[3] || '').trim();
-                        const tc = String(row[4] || '').trim();
-                        const placas_2 = String(row[5] || '').trim();
-                        const tc_2 = String(row[6] || '').trim();
-
-                        if(!db.colaboradores.find(c => c.num === num)) {
-                            db.colaboradores.push({ 
-                                id: Date.now() + i, num, nombre, correo, 
-                                placas, tc, foto_tc: null, placas_2, tc_2, foto_tc_2: null, prioridad: 0
-                            });
-                            agregados++;
-                        } else duplicados++;
+                    const wb = XLSX.read(new Uint8Array(ev.target.result), {type:'array'}), rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1});
+                    let ag = 0, dp = 0;
+                    for(let i=1; i<rows.length; i++){
+                        if(!rows[i]||!rows[i][0]) continue;
+                        const num = String(rows[i][0]).trim();
+                        if(!db.colaboradores.find(c=>c.num===num)) {
+                            db.colaboradores.push({ id: Date.now()+i, num, nombre: String(rows[i][1]||'').trim(), correo: String(rows[i][2]||'').trim(), placas: String(rows[i][3]||'').trim(), tc: String(rows[i][4]||'').trim(), foto_tc: null, placas_2: String(rows[i][5]||'').trim(), tc_2: String(rows[i][6]||'').trim(), foto_tc_2: null, prioridad: 0 });
+                            ag++;
+                        } else dp++;
                     }
-
-                    if(agregados > 0) {
-                        guardarData();
-                        mostrarToast(`${agregados} importados exitosamente. (${duplicados} omitidos)`, "bg-green-500");
-                    } else if (duplicados > 0) mostrarToast("No se importó ninguno (Todos los folios ya existían).", "bg-yellow-500");
-                    else mostrarToast("El archivo parece estar vacío o con formato incorrecto.", "bg-red-500");
-                } catch (error) { alert("Error al leer el archivo Excel. Revisa el formato."); }
-                document.getElementById('archivo-excel').value = '';
-            };
-            reader.readAsArrayBuffer(file);
+                    if(ag>0) { guardarData(); mostrarToast(`${ag} importados (${dp} omitidos)`, "bg-green-500"); } else mostrarToast("Todos existían", "bg-yellow-500");
+                } catch(err){ alert("Error de formato"); }
+                document.getElementById('archivo-excel').value='';
+            }; r.readAsArrayBuffer(f);
         }
 
         function renderColaboradores() {
-            const tbody = document.getElementById('lista-colaboradores');
-            const ulColab = document.getElementById('dropdown-colaboradores');
-            const searchVal = document.getElementById('search-colaboradores') ? document.getElementById('search-colaboradores').value.toLowerCase() : '';
-            
+            const tbody = document.getElementById('lista-colaboradores'), ul = document.getElementById('dropdown-colaboradores');
+            const sv = document.getElementById('search-colaboradores')?document.getElementById('search-colaboradores').value.toLowerCase():'';
             document.getElementById('contador-colaboradores').innerText = `${db.colaboradores.length} Registros`;
 
-            let filtrados = [...db.colaboradores].filter(c => 
-                c.nombre.toLowerCase().includes(searchVal) || 
-                c.num.toLowerCase().includes(searchVal) || 
-                c.placas.toLowerCase().includes(searchVal) ||
-                (c.placas_2 && c.placas_2.toLowerCase().includes(searchVal))
-            );
+            let filt = db.colaboradores.filter(c => c.nombre.toLowerCase().includes(sv) || c.num.toLowerCase().includes(sv) || c.placas.toLowerCase().includes(sv) || (c.placas_2 && c.placas_2.toLowerCase().includes(sv)));
+            filt.sort((a, b) => { const pA=a.prioridad||0, pB=b.prioridad||0; if(pA>0 && pB>0) return pA-pB; if(pA>0) return -1; if(pB>0) return 1; return b.id-a.id; });
 
-            filtrados.sort((a, b) => {
-                const pA = a.prioridad || 0; const pB = b.prioridad || 0;
-                if (pA > 0 && pB > 0) return pA - pB; 
-                if (pA > 0) return -1; 
-                if (pB > 0) return 1;  
-                return b.id - a.id; 
-            });
-
-            if (filtrados.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="p-8"><div class="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-10 bg-gray-50 text-gray-400"><i class="fas ${searchVal ? 'fa-search' : 'fa-users'} text-4xl mb-3 block"></i><span class="font-medium">${searchVal ? 'No hay resultados de búsqueda' : 'Sin colaboradores registrados.'}</span></div></td></tr>`;
-            } else { tbody.innerHTML = ''; }
-
-            if(ulColab) ulColab.innerHTML = '';
+            if (filt.length === 0) tbody.innerHTML = `<tr><td colspan="5" class="p-8"><div class="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-10 bg-gray-50 text-gray-400"><i class="fas ${sv?'fa-search':'fa-users'} text-4xl mb-3 block"></i><span class="font-medium">${sv?'Sin resultados':'Sin colaboradores.'}</span></div></td></tr>`;
+            else tbody.innerHTML = '';
+            if(ul) ul.innerHTML = '';
             
-            filtrados.forEach(c => {
-                let btnFotoHtml1 = c.foto_tc 
-                    ? `<button onclick="verFotoTC('${c.id}', 1)" type="button" class="ml-2 text-coppel-blue hover:text-blue-800 transition px-1" title="Ver foto"><i class="fas fa-image text-sm"></i></button>`
-                    : `<button onclick="abrirCargaFoto('${c.id}', 1)" type="button" class="ml-2 text-gray-400 hover:text-green-600 transition px-1 flex items-center" title="Agregar foto"><i class="fas fa-image text-sm"></i><i class="fas fa-plus text-[9px] -mt-2 ml-0.5 font-black"></i></button>`;
-
-                let v2Html = '';
-                if (c.placas_2) {
-                    let btnFotoHtml2 = c.foto_tc_2 
-                        ? `<button onclick="verFotoTC('${c.id}', 2)" type="button" class="ml-2 text-coppel-blue hover:text-blue-800 transition px-1" title="Ver foto V2"><i class="fas fa-image text-sm"></i></button>`
-                        : `<button onclick="abrirCargaFoto('${c.id}', 2)" type="button" class="ml-2 text-gray-400 hover:text-green-600 transition px-1 flex items-center" title="Agregar foto V2"><i class="fas fa-image text-sm"></i><i class="fas fa-plus text-[9px] -mt-2 ml-0.5 font-black"></i></button>`;
-                           
-                    v2Html = `<div class="mt-2 pt-2 border-t border-gray-200"><span class="block font-bold uppercase"><i class="fas fa-car mr-1 text-gray-400"></i>${c.placas_2}</span><div class="flex items-center mt-1"><span class="block uppercase"><i class="fas fa-id-card mr-1 text-gray-400"></i>${c.tc_2}</span>${btnFotoHtml2}</div></div>`;
-                }
-
-                const hasPrio = c.prioridad > 0;
-                const rowClass = hasPrio ? 'bg-yellow-50 hover:bg-yellow-100 transition border-l-4 border-coppel-yellow' : 'hover:bg-gray-50 transition border-l-4 border-transparent';
-                const starColor = hasPrio ? 'text-coppel-yellow drop-shadow-sm' : 'text-gray-300 hover:text-gray-400';
-                const starHtml = hasPrio ? `<div class="relative inline-flex items-center justify-center w-8 h-8"><i class="fas fa-star text-3xl ${starColor}"></i><span class="absolute inset-0 flex items-center justify-center text-[11px] font-black text-yellow-900 pt-1">${c.prioridad}</span></div>` : `<div class="w-8 h-8 flex items-center justify-center"><i class="fas fa-star text-2xl ${starColor}"></i></div>`;
+            filt.forEach(c => {
+                let f1 = c.foto_tc ? `<button onclick="verFotoTC('${c.id}', 1)" class="ml-2 text-coppel-blue hover:text-blue-800"><i class="fas fa-image"></i></button>` : `<button onclick="abrirCargaFoto('${c.id}', 1)" class="ml-2 text-gray-400 hover:text-green-600 flex items-center"><i class="fas fa-image"></i><i class="fas fa-plus text-[9px] -mt-2"></i></button>`;
+                let v2 = ''; if(c.placas_2){ let f2 = c.foto_tc_2 ? `<button onclick="verFotoTC('${c.id}', 2)" class="ml-2 text-coppel-blue hover:text-blue-800"><i class="fas fa-image"></i></button>` : `<button onclick="abrirCargaFoto('${c.id}', 2)" class="ml-2 text-gray-400 hover:text-green-600 flex items-center"><i class="fas fa-image"></i><i class="fas fa-plus text-[9px] -mt-2"></i></button>`; v2 = `<div class="mt-2 pt-2 border-t border-gray-200"><span class="block font-bold uppercase"><i class="fas fa-car mr-1 text-gray-400"></i>${c.placas_2}</span><div class="flex items-center mt-1"><span class="block uppercase"><i class="fas fa-id-card mr-1 text-gray-400"></i>${c.tc_2}</span>${f2}</div></div>`; }
+                
+                const hp = c.prioridad>0, cl = hp?'bg-yellow-50 border-coppel-yellow':'hover:bg-gray-50 border-transparent', sc = hp?'text-coppel-yellow drop-shadow-sm':'text-gray-300';
+                const st = hp?`<div class="relative inline-flex items-center justify-center w-8 h-8"><i class="fas fa-star text-3xl ${sc}"></i><span class="absolute inset-0 flex items-center justify-center text-[11px] font-black text-yellow-900 pt-1">${c.prioridad}</span></div>`:`<i class="fas fa-star text-2xl ${sc}"></i>`;
 
                 tbody.innerHTML += `
-                    <tr class="${rowClass}">
-                        <td class="px-4 py-3 text-center align-top pt-4"><button onclick="togglePrioridad('${c.id}')" type="button" class="transition focus:outline-none" title="Prioridad">${starHtml}</button></td>
+                    <tr class="${cl} border-l-4 transition">
+                        <td class="px-4 py-3 text-center align-top pt-4"><button onclick="togglePrioridad('${c.id}')" class="focus:outline-none">${st}</button></td>
                         <td class="px-2 py-3 font-semibold text-coppel-blue align-top pt-4">${c.num}</td>
-                        <td class="px-4 py-3 font-medium text-gray-800 align-top pt-4">${c.nombre}</td>
-                        <td class="px-4 py-3 text-gray-600 align-top pt-4 text-xs">${c.correo}</td>
-                        <td class="px-4 py-3 text-gray-600 text-xs align-top">
-                            <div><span class="block font-bold uppercase"><i class="fas fa-car mr-1 text-gray-400"></i>${c.placas}</span><div class="flex items-center mt-1"><span class="block uppercase"><i class="fas fa-id-card mr-1 text-gray-400"></i>${c.tc}</span>${btnFotoHtml1}</div></div>${v2Html}
-                        </td>
-                        <td class="px-4 py-3 text-center align-top whitespace-nowrap pt-4">
-                            <button onclick="abrirModalEditarColaborador('${c.id}')" type="button" class="text-blue-500 hover:text-blue-700 transition mr-3" title="Editar"><i class="fas fa-edit"></i></button>
-                            <button onclick="abrirModalEliminarColaborador('${c.id}')" type="button" class="text-red-400 hover:text-red-600 transition" title="Eliminar"><i class="fas fa-trash"></i></button>
-                        </td>
-                    </tr>
-                `;
-                
-                if(ulColab) {
-                    const iconPrio = hasPrio ? `★${c.prioridad} ` : '';
-                    ulColab.innerHTML += `<li onclick="seleccionarOpcion('buscar-colaborador', 'dropdown-colaboradores', '${c.num} - ${c.nombre}')" class="px-4 py-2 hover:bg-coppel-blue hover:text-white cursor-pointer border-b text-sm transition ${hasPrio ? 'font-bold text-coppel-blue bg-yellow-50' : 'text-gray-700'}">${iconPrio}${c.num} - ${c.nombre}</li>`;
-                }
+                        <td class="px-4 py-3 align-top pt-4"><div class="font-bold text-gray-800">${c.nombre}</div><div class="text-xs text-gray-500 mt-1"><i class="fas fa-envelope mr-1 text-gray-400"></i>${c.correo}</div></td>
+                        <td class="px-4 py-3 text-gray-600 text-xs align-top"><div><span class="block font-bold uppercase"><i class="fas fa-car mr-1 text-gray-400"></i>${c.placas}</span><div class="flex items-center mt-1"><span class="block uppercase"><i class="fas fa-id-card mr-1 text-gray-400"></i>${c.tc}</span>${f1}</div></div>${v2}</td>
+                        <td class="px-4 py-3 text-center align-top whitespace-nowrap pt-4"><button onclick="abrirModalEditarColaborador('${c.id}')" class="text-blue-500 mr-3"><i class="fas fa-edit"></i></button><button onclick="abrirModalEliminarColaborador('${c.id}')" class="text-red-400"><i class="fas fa-trash"></i></button></td>
+                    </tr>`;
             });
-            
-            if (ulColab && db.colaboradores.length !== filtrados.length) {
-                ulColab.innerHTML = '';
-                const todosOrdenados = [...db.colaboradores].sort((a,b) => (b.id - a.id));
-                todosOrdenados.forEach(c => {
-                    const iconPrio = c.prioridad > 0 ? `★${c.prioridad} ` : '';
-                    ulColab.innerHTML += `<li onclick="seleccionarOpcion('buscar-colaborador', 'dropdown-colaboradores', '${c.num} - ${c.nombre}')" class="px-4 py-2 hover:bg-coppel-blue hover:text-white cursor-pointer border-b text-sm transition ${c.prioridad > 0 ? 'font-bold text-coppel-blue bg-yellow-50' : 'text-gray-700'}">${iconPrio}${c.num} - ${c.nombre}</li>`;
-                });
-            }
+
+            if(ul) db.colaboradores.sort((a,b)=>b.id-a.id).forEach(c => ul.innerHTML += `<li onclick="seleccionarOpcion('buscar-colaborador', 'dropdown-colaboradores', '${c.num} - ${c.nombre}')" class="px-4 py-2 hover:bg-coppel-blue hover:text-white cursor-pointer border-b text-sm transition ${c.prioridad>0?'font-bold bg-yellow-50':''}">${c.prioridad>0?`★${c.prioridad} `:''}${c.num} - ${c.nombre}</li>`);
         }
 
         function registrarTarjeta() {
-            const form = document.getElementById('form-tarjeta');
-            if (!form.checkValidity()) { form.reportValidity(); return; }
+            const form = document.getElementById('form-tarjeta'); if (!form.checkValidity()) { form.reportValidity(); return; }
             const folio = document.getElementById('tarjeta-folio').value.trim();
-            if(db.tarjetas.find(t => t.folio.toLowerCase() === folio.toLowerCase())) return mostrarToast("Ese folio ya existe", "bg-red-500");
-            db.tarjetas.push({ id: Date.now(), folio: folio, estado: 'Disponible' });
-            guardarData();
-            form.reset();
-            mostrarToast("Tarjeta registrada", "bg-gray-800");
+            if(db.tarjetas.find(t => t.folio.toLowerCase() === folio.toLowerCase())) return mostrarToast("Ya existe", "bg-red-500");
+            db.tarjetas.push({ id: Date.now(), folio, estado: 'Disponible' }); guardarData(); form.reset(); mostrarToast("Registrada", "bg-gray-800");
         }
 
         function renderTarjetas() {
-            const tbody = document.getElementById('lista-inventario-tarjetas');
-            const ulTarjetas = document.getElementById('dropdown-tarjetas');
-            const contador = document.getElementById('contador-tarjetas');
-            const searchVal = document.getElementById('search-tarjetas') ? document.getElementById('search-tarjetas').value.toLowerCase() : '';
+            const tbody = document.getElementById('lista-inventario-tarjetas'), ul = document.getElementById('dropdown-tarjetas'), sv = document.getElementById('search-tarjetas')?document.getElementById('search-tarjetas').value.toLowerCase():'';
+            document.getElementById('contador-tarjetas').innerText = `${db.tarjetas.length} Tarjetas`;
+
+            let filt = db.tarjetas.filter(t => t.folio.toLowerCase().includes(sv)).sort((a,b) => a.folio.localeCompare(b.folio, undefined, {numeric: true}));
+            if (filt.length === 0) tbody.innerHTML = `<tr><td colspan="3" class="p-8"><div class="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-10 bg-gray-50 text-gray-400"><i class="fas ${sv?'fa-search':'fa-id-badge'} text-4xl mb-3"></i><span class="font-medium">${sv?'Sin resultados.':'Sin tarjetas.'}</span></div></td></tr>`;
+            else tbody.innerHTML = '';
             
-            contador.innerText = `${db.tarjetas.length} Tarjetas`;
-
-            let filtrados = [...db.tarjetas].filter(t => t.folio.toLowerCase().includes(searchVal));
-            filtrados.sort((a, b) => a.folio.localeCompare(b.folio, undefined, {numeric: true}));
-
-            if (filtrados.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="3" class="p-8"><div class="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-10 bg-gray-50 text-gray-400"><i class="fas ${searchVal ? 'fa-search' : 'fa-id-badge'} text-4xl mb-3 block"></i><span class="font-medium">${searchVal ? 'No hay resultados.' : 'No hay tarjetas registradas.'}</span></div></td></tr>`;
-            } else { tbody.innerHTML = ''; }
-
-            if(ulTarjetas) ulTarjetas.innerHTML = '';
-            let hayDisponibles = false;
-
-            filtrados.forEach(t => {
-                const isDisponible = t.estado === 'Disponible';
-                const badgeClass = isDisponible ? 'bg-green-100 text-green-800 border-green-300' : 'bg-red-100 text-red-800 border-red-300';
-                const iconClass = isDisponible ? 'fa-check-circle' : 'fa-times-circle';
-
+            if(ul) ul.innerHTML = ''; let hd = false;
+            filt.forEach(t => {
+                const isD = t.estado === 'Disponible', bc = isD?'bg-green-100 text-green-800 border-green-300':'bg-red-100 text-red-800 border-red-300', ic = isD?'fa-check-circle':'fa-times-circle';
                 tbody.innerHTML += `
                     <tr class="hover:bg-gray-50 transition">
                         <td class="px-6 py-4 text-center"><span class="font-black text-gray-800 text-lg bg-gray-100 border px-4 py-1 rounded shadow-inner inline-block min-w-[100px]">${t.folio}</span></td>
-                        <td class="px-6 py-4"><span class="text-xs font-bold px-2 py-1 rounded border ${badgeClass}"><i class="fas ${iconClass} mr-1"></i>${t.estado}</span></td>
-                        <td class="px-4 py-4 text-center">
-                            ${isDisponible ? `<button onclick="abrirModalEliminarTarjeta('${t.id}')" type="button" class="text-red-400 hover:text-red-600" title="Eliminar"><i class="fas fa-trash"></i></button>` : `<span class="text-gray-300 text-xs" title="En uso"><i class="fas fa-ban"></i></span>`}
-                        </td>
-                    </tr>
-                `;
-                if(isDisponible && ulTarjetas) {
-                    ulTarjetas.innerHTML += `<li onclick="seleccionarOpcion('buscar-tarjeta', 'dropdown-tarjetas', '${t.folio}')" class="px-4 py-2 hover:bg-coppel-blue hover:text-white cursor-pointer border-b text-sm transition font-bold text-gray-700">Folio: ${t.folio}</li>`;
-                    hayDisponibles = true;
-                }
+                        <td class="px-6 py-4"><span class="text-xs font-bold px-2 py-1 rounded border ${bc}"><i class="fas ${ic} mr-1"></i>${t.estado}</span></td>
+                        <td class="px-4 py-4 text-center">${isD?`<button onclick="abrirModalEliminarTarjeta('${t.id}')" class="text-red-400 hover:text-red-600"><i class="fas fa-trash"></i></button>`:`<i class="fas fa-ban text-gray-300"></i>`}</td>
+                    </tr>`;
+                if(isD && ul) { ul.innerHTML += `<li onclick="seleccionarOpcion('buscar-tarjeta', 'dropdown-tarjetas', '${t.folio}')" class="px-4 py-2 hover:bg-coppel-blue hover:text-white cursor-pointer border-b text-sm font-bold">Folio: ${t.folio}</li>`; hd = true; }
             });
-
-            if (ulTarjetas && db.tarjetas.length !== filtrados.length) {
-                ulTarjetas.innerHTML = '';
-                hayDisponibles = false;
-                const todosOrdenados = [...db.tarjetas].sort((a,b) => a.folio.localeCompare(b.folio, undefined, {numeric: true}));
-                todosOrdenados.forEach(t => {
-                    if(t.estado === 'Disponible') {
-                        ulTarjetas.innerHTML += `<li onclick="seleccionarOpcion('buscar-tarjeta', 'dropdown-tarjetas', '${t.folio}')" class="px-4 py-2 hover:bg-coppel-blue hover:text-white cursor-pointer border-b text-sm transition font-bold text-gray-700">Folio: ${t.folio}</li>`;
-                        hayDisponibles = true;
-                    }
-                });
-            }
-            if(!hayDisponibles && ulTarjetas) ulTarjetas.innerHTML = `<li class="px-4 py-3 text-sm text-gray-400 text-center italic">No hay tarjetas disponibles</li>`;
+            if(ul && db.tarjetas.length !== filt.length) { ul.innerHTML=''; hd=false; db.tarjetas.sort((a,b)=>a.folio.localeCompare(b.folio, undefined, {numeric: true})).forEach(t => { if(t.estado==='Disponible'){ ul.innerHTML += `<li onclick="seleccionarOpcion('buscar-tarjeta', 'dropdown-tarjetas', '${t.folio}')" class="px-4 py-2 hover:bg-coppel-blue hover:text-white cursor-pointer border-b text-sm font-bold">Folio: ${t.folio}</li>`; hd=true; } }); }
+            if(!hd && ul) ul.innerHTML = `<li class="px-4 py-3 text-sm text-gray-400 text-center italic">Sin tarjetas disponibles</li>`;
         }
 
         function asignarPrestamo() {
-            const form = document.getElementById('form-prestamo');
-            if (!form.checkValidity()) { form.reportValidity(); return; }
-
-            const esIndefinido = document.getElementById('indefinido-switch').checked;
-            const inputColab = document.getElementById('buscar-colaborador').value.trim();
-            const inputFolio = document.getElementById('buscar-tarjeta').value.replace('Folio: ', '').trim();
-            const dias = parseInt(document.getElementById('dias-prestamo').value) || 7;
-
-            const colab = db.colaboradores.find(c => `${c.num} - ${c.nombre}` === inputColab || c.num === inputColab);
+            const form = document.getElementById('form-prestamo'); if (!form.checkValidity()) { form.reportValidity(); return; }
+            const ind = document.getElementById('indefinido-switch').checked, colabInp = document.getElementById('buscar-colaborador').value.trim(), folInp = document.getElementById('buscar-tarjeta').value.replace('Folio: ', '').trim();
+            const colab = db.colaboradores.find(c => `${c.num} - ${c.nombre}` === colabInp || c.num === colabInp);
             if(!colab) return mostrarToast("Colaborador no encontrado.", "bg-red-500");
-
-            const yaTienePrestamo = db.prestamos.some(p => String(p.id_colaborador) === String(colab.id));
-            if (yaTienePrestamo) return mostrarToast("Este colaborador ya tiene una tarjeta prestada.", "bg-red-500");
-
-            const tarjeta = db.tarjetas.find(t => t.folio.toLowerCase() === inputFolio.toLowerCase() && t.estado === 'Disponible');
-            if(!tarjeta) return mostrarToast("Tarjeta no disponible.", "bg-red-500");
+            if (db.prestamos.some(p => String(p.id_colaborador) === String(colab.id))) return mostrarToast("Ya tiene tarjeta", "bg-red-500");
+            const tarjeta = db.tarjetas.find(t => t.folio.toLowerCase() === folInp.toLowerCase() && t.estado === 'Disponible');
+            if(!tarjeta) return mostrarToast("Tarjeta no disponible", "bg-red-500");
             
             tarjeta.estado = 'Prestada';
-            const inicio = new Date();
-            let finIso = null;
+            let f = null; if(!ind) { const dt = new Date(); dt.setDate(dt.getDate() + (parseInt(document.getElementById('dias-prestamo').value)||7)); f = dt.toISOString(); }
+            db.prestamos.push({ id: Date.now(), id_colaborador: colab.id, id_tarjeta: tarjeta.id, fecha_inicio: new Date().toISOString(), fecha_fin: f, indefinido: ind });
             
-            if (!esIndefinido) {
-                const fin = new Date();
-                fin.setDate(fin.getDate() + dias);
-                finIso = fin.toISOString();
-            }
-
-            db.prestamos.push({ id: Date.now(), id_colaborador: colab.id, id_tarjeta: tarjeta.id, fecha_inicio: inicio.toISOString(), fecha_fin: finIso, indefinido: esIndefinido });
-            guardarData();
-            form.reset();
-            document.getElementById('dias-prestamo').value = 7;
-            document.getElementById('indefinido-switch').checked = false;
-            toggleIndefinido();
-            mostrarToast(`Préstamo asignado al folio ${tarjeta.folio}`, "bg-coppel-blue");
+            guardarData(); form.reset(); document.getElementById('dias-prestamo').value = 7; document.getElementById('indefinido-switch').checked = false; toggleIndefinido();
+            mostrarToast(`Asignado folio ${tarjeta.folio}`, "bg-coppel-blue");
         }
 
         function renderPrestamos() {
-            const tbody = document.getElementById('lista-prestamos');
-            const searchVal = document.getElementById('search-prestamos') ? document.getElementById('search-prestamos').value.toLowerCase() : '';
+            const tbody = document.getElementById('lista-prestamos'), sv = document.getElementById('search-prestamos')?document.getElementById('search-prestamos').value.toLowerCase():'';
+            let map = db.prestamos.map(p => ({ ...p, cObj: db.colaboradores.find(c => String(c.id) === String(p.id_colaborador)), tObj: db.tarjetas.find(t => String(t.id) === String(p.id_tarjeta)) })).filter(p => p.cObj && p.tObj);
+            map = map.filter(p => p.cObj.nombre.toLowerCase().includes(sv) || p.cObj.placas.toLowerCase().includes(sv) || (p.cObj.placas_2 && p.cObj.placas_2.toLowerCase().includes(sv)) || p.tObj.folio.toLowerCase().includes(sv));
 
-            let mapeados = db.prestamos.map(p => {
-                return { 
-                    ...p, 
-                    colabObj: db.colaboradores.find(c => String(c.id) === String(p.id_colaborador)),
-                    tarjetaObj: db.tarjetas.find(t => String(t.id) === String(p.id_tarjeta))
-                };
-            }).filter(p => p.colabObj && p.tarjetaObj);
-
-            mapeados = mapeados.filter(p => 
-                p.colabObj.nombre.toLowerCase().includes(searchVal) ||
-                p.colabObj.placas.toLowerCase().includes(searchVal) ||
-                (p.colabObj.placas_2 && p.colabObj.placas_2.toLowerCase().includes(searchVal)) ||
-                p.tarjetaObj.folio.toLowerCase().includes(searchVal)
-            );
-
-            if (mapeados.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="4" class="p-8"><div class="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-10 bg-gray-50 text-gray-400"><i class="fas ${searchVal ? 'fa-search' : 'fa-parking'} text-4xl mb-3 block"></i><span class="font-medium">${searchVal ? 'No hay resultados de búsqueda' : 'Sin tarjetas prestadas.'}</span></div></td></tr>`;
-                return;
-            }
-
+            if (map.length === 0) { tbody.innerHTML = `<tr><td colspan="4" class="p-8"><div class="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-10 bg-gray-50 text-gray-400"><i class="fas ${sv?'fa-search':'fa-parking'} text-4xl mb-3 block"></i><span class="font-medium">${sv?'Sin resultados':'Sin tarjetas prestadas.'}</span></div></td></tr>`; return; }
             tbody.innerHTML = '';
 
-            mapeados.forEach(p => {
-                const colab = p.colabObj;
-                const tarjeta = p.tarjetaObj;
-
-                let badge = 'bg-blue-100 text-blue-800 border-blue-300';
-                let txtBadge = 'Sin límite';
-                let fechaTexto = 'Indefinido';
-                let filaClass = 'hover:bg-gray-50 transition border-l-4 border-transparent'; 
-                let btnAvisoHtml = ''; 
+            map.forEach(p => {
+                const colab = p.cObj, tj = p.tObj;
+                let bg='bg-blue-100 text-blue-800 border-blue-300', tb='Sin límite', ft='Indefinido', row='hover:bg-gray-50 border-transparent', aviso=''; 
 
                 if (!p.indefinido) {
-                    const fin = new Date(p.fecha_fin);
-                    fechaTexto = fin.toLocaleDateString('es-MX');
-
-                    const hoy = new Date();
-                    hoy.setHours(0,0,0,0);
-                    const finDia = new Date(fin);
-                    finDia.setHours(0,0,0,0);
-                    const diasRestantes = Math.ceil((finDia - hoy) / 86400000);
-
-                    badge = 'bg-green-100 text-green-800 border-green-300';
-                    txtBadge = `${diasRestantes} días restantes`;
-
-                    if (diasRestantes <= 2 && diasRestantes > 0) {
-                        badge = 'bg-yellow-100 text-yellow-800 border-yellow-300';
-                    } else if (diasRestantes === 0) {
-                        badge = 'bg-orange-100 text-orange-800 border-orange-400 font-bold';
-                        txtBadge = 'Vence hoy';
-                        filaClass = 'bg-orange-50 hover:bg-orange-100 transition border-l-4 border-orange-400';
-                    } else if (diasRestantes < 0) {
-                        badge = 'bg-red-100 text-red-800 border-red-400 font-black animate-pulse shadow-sm';
-                        txtBadge = `VENCIDO (hace ${Math.abs(diasRestantes)} días)`;
-                        filaClass = 'bg-red-50 hover:bg-red-100 transition border-l-4 border-red-500 shadow-sm';
-                        
-                        if (colab.correo) {
-                            const subject = encodeURIComponent("Aviso de Devolución - Tarjeta de Estacionamiento");
-                            const body = encodeURIComponent(`Hola ${colab.nombre},\n\nTe recordamos que tu préstamo de la tarjeta de estacionamiento con el folio [ ${tarjeta.folio} ] se encuentra VENCIDA.\n\nTe pedimos de favor hacer la entrega de la misma a la brevedad para evitar inconvenientes.\n\nSaludos.`);
-                            btnAvisoHtml = `<a href="mailto:${colab.correo}?subject=${subject}&body=${body}" class="text-xs bg-white text-orange-500 border border-orange-200 px-3 py-1.5 rounded hover:bg-orange-50 transition font-bold shadow-sm mr-2" title="Enviar aviso por correo"><i class="fas fa-envelope mr-1"></i> Aviso</a>`;
-                        }
+                    const f = new Date(p.fecha_fin); ft = f.toLocaleDateString('es-MX'); const hoy = new Date(); hoy.setHours(0,0,0,0); f.setHours(0,0,0,0); const dr = Math.ceil((f-hoy)/86400000);
+                    bg='bg-green-100 text-green-800 border-green-300'; tb=`${dr} días restantes`;
+                    if (dr <= 2 && dr > 0) bg='bg-yellow-100 text-yellow-800 border-yellow-300';
+                    else if (dr === 0) { bg='bg-orange-100 text-orange-800 border-orange-400 font-bold'; tb='Vence hoy'; row='bg-orange-50 border-orange-400'; }
+                    else if (dr < 0) {
+                        bg='bg-red-100 text-red-800 border-red-400 font-black animate-pulse shadow-sm'; tb=`VENCIDO (hace ${Math.abs(dr)} días)`; row='bg-red-50 border-red-500 shadow-sm';
+                        if (colab.correo) aviso = `<a href="mailto:${colab.correo}?subject=${encodeURIComponent("Aviso Devolución - Tarjeta")} &body=${encodeURIComponent(`Hola ${colab.nombre},\n\nTu tarjeta [ ${tj.folio} ] está VENCIDA.\n\nFavor de entregarla.\n\nSaludos.`)}" class="text-xs bg-white text-orange-500 border border-orange-200 px-3 py-1.5 rounded mr-2 font-bold shadow-sm"><i class="fas fa-envelope mr-1"></i> Aviso</a>`;
                     }
                 }
-                
-                let textoPlacas = colab.placas.toUpperCase();
-                if (colab.placas_2) textoPlacas += ` / ${colab.placas_2.toUpperCase()}`;
-                const iconPrio = colab.prioridad > 0 ? `<i class="fas fa-star text-coppel-yellow mr-1" title="Prioridad ${colab.prioridad}"></i>` : '';
-
+                const pl = colab.placas_2 ? `${colab.placas} / ${colab.placas_2}` : colab.placas;
                 tbody.innerHTML += `
-                    <tr class="${filaClass}">
-                        <td class="px-6 py-4 text-center"><span class="font-black text-coppel-blue text-lg bg-white border px-4 py-1 rounded shadow-sm inline-block min-w-[100px] text-center">${tarjeta.folio}</span></td>
-                        <td class="px-6 py-4">
-                            <div class="font-bold text-gray-800 truncate">${iconPrio}${colab.nombre}</div>
-                            <div class="text-xs text-coppel-blue font-semibold">No. ${colab.num} <span class="text-gray-400 ml-1">| Placas: ${textoPlacas}</span></div>
-                        </td>
-                        <td class="px-4 py-4">
-                            <div class="text-sm text-gray-800 font-medium mb-1">${fechaTexto}</div>
-                            <span class="text-[10px] font-bold px-2 py-0.5 rounded border ${badge} inline-block">${p.indefinido ? '<i class="fas fa-infinity mr-1"></i>' : '<i class="fas fa-clock mr-1"></i>'} ${txtBadge}</span>
-                        </td>
-                        <td class="px-4 py-4 text-center whitespace-nowrap">
-                            ${btnAvisoHtml}
-                            <button type="button" onclick="abrirModalConfirmacion('${p.id}', '${tarjeta.id}')" class="text-xs bg-white text-red-600 border border-red-200 px-3 py-1.5 rounded hover:bg-red-50 transition font-bold shadow-sm">
-                                <i class="fas fa-undo mr-1"></i> Devolver
-                            </button>
-                        </td>
-                    </tr>
-                `;
+                    <tr class="${row} border-l-4 transition">
+                        <td class="px-6 py-4 text-center"><span class="font-black text-coppel-blue text-lg bg-white border px-4 py-1 rounded shadow-sm inline-block min-w-[100px]">${tj.folio}</span></td>
+                        <td class="px-6 py-4"><div class="font-bold text-gray-800 truncate">${colab.prioridad>0?`<i class="fas fa-star text-coppel-yellow mr-1"></i>`:''}${colab.nombre}</div><div class="text-xs text-coppel-blue font-semibold">No. ${colab.num} <span class="text-gray-400 ml-1">| Placas: ${pl.toUpperCase()}</span></div></td>
+                        <td class="px-4 py-4"><div class="text-sm text-gray-800 font-medium mb-1">${ft}</div><span class="text-[10px] font-bold px-2 py-0.5 rounded border ${bg} inline-block">${p.indefinido?'<i class="fas fa-infinity"></i>':'<i class="fas fa-clock"></i>'} ${tb}</span></td>
+                        <td class="px-4 py-4 text-center whitespace-nowrap">${aviso}<button onclick="abrirModalConfirmacion('${p.id}', '${tj.id}')" class="text-xs bg-white text-red-600 border border-red-200 px-3 py-1.5 rounded font-bold shadow-sm"><i class="fas fa-undo mr-1"></i> Devolver</button></td>
+                    </tr>`;
             });
         }
 
         function renderHistorial() {
-            const tbody = document.getElementById('lista-historial');
-            const searchVal = document.getElementById('search-historial') ? document.getElementById('search-historial').value.toLowerCase() : '';
+            const tbody = document.getElementById('lista-historial'), sv = document.getElementById('search-historial')?document.getElementById('search-historial').value.toLowerCase():'';
+            let map = db.historial.map(h => ({ ...h, cObj: db.colaboradores.find(c => String(c.id) === String(h.id_colaborador)) || { nombre: "Eliminado", num: "N/A" }, tObj: db.tarjetas.find(t => String(t.id) === String(h.id_tarjeta)) || { folio: "Eliminada" } })).reverse();
+            map = map.filter(h => h.cObj.nombre.toLowerCase().includes(sv) || h.tObj.folio.toLowerCase().includes(sv));
 
-            let mapeados = db.historial.map(h => {
-                return { 
-                    ...h, 
-                    colabObj: db.colaboradores.find(c => String(c.id) === String(h.id_colaborador)) || { nombre: "Colaborador Eliminado", num: "N/A" },
-                    tarjetaObj: db.tarjetas.find(t => String(t.id) === String(h.id_tarjeta)) || { folio: "Eliminada" }
-                };
-            }).reverse();
-
-            mapeados = mapeados.filter(h => 
-                h.colabObj.nombre.toLowerCase().includes(searchVal) ||
-                h.tarjetaObj.folio.toLowerCase().includes(searchVal)
-            );
-
-            if (mapeados.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="p-8"><div class="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-10 bg-gray-50 text-gray-400"><i class="fas ${searchVal ? 'fa-search' : 'fa-folder-open'} text-4xl mb-3 block"></i><span class="font-medium">${searchVal ? 'No hay resultados de búsqueda' : 'El historial está vacío.'}</span></div></td></tr>`;
-                return;
-            }
+            if (map.length === 0) { tbody.innerHTML = `<tr><td colspan="5" class="p-8"><div class="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-10 bg-gray-50 text-gray-400"><i class="fas ${sv?'fa-search':'fa-folder-open'} text-4xl mb-3 block"></i><span class="font-medium">${sv?'Sin resultados':'Historial vacío'}</span></div></td></tr>`; return; }
 
             tbody.innerHTML = '';
-
-            mapeados.forEach(h => {
-                const colab = h.colabObj;
-                const tarjeta = h.tarjetaObj;
-                
-                const inicioStr = new Date(h.fecha_inicio).toLocaleString('es-MX', {dateStyle: 'short', timeStyle: 'short'});
-                const devueltoStr = new Date(h.fecha_devolucion_real).toLocaleString('es-MX', {dateStyle: 'short', timeStyle: 'short'});
-
-                let estadoHtml = '';
-                if(h.indefinido) {
-                    estadoHtml = `<span class="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2 py-1 rounded font-bold"><i class="fas fa-check-circle mr-1"></i>Completado (Indef.)</span>`;
-                } else {
-                    const finProgramado = new Date(h.fecha_fin);
-                    finProgramado.setHours(23,59,59,999);
-                    const devuelto = new Date(h.fecha_devolucion_real);
-                    
-                    if (devuelto <= finProgramado) {
-                        estadoHtml = `<span class="text-xs bg-green-50 text-green-700 border border-green-200 px-2 py-1 rounded font-bold"><i class="fas fa-check-circle mr-1"></i>A Tiempo</span>`;
-                    } else {
-                        estadoHtml = `<span class="text-xs bg-red-50 text-red-700 border border-red-200 px-2 py-1 rounded font-bold"><i class="fas fa-exclamation-circle mr-1"></i>Entregó Tarde</span>`;
-                    }
+            map.forEach(h => {
+                let est = '';
+                if(h.indefinido) est = `<span class="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2 py-1 rounded font-bold"><i class="fas fa-check-circle"></i> Indefinido</span>`;
+                else {
+                    const fP = new Date(h.fecha_fin); fP.setHours(23,59,59,999);
+                    est = new Date(h.fecha_devolucion_real) <= fP ? `<span class="text-xs bg-green-50 text-green-700 border border-green-200 px-2 py-1 rounded font-bold"><i class="fas fa-check-circle"></i> A Tiempo</span>` : `<span class="text-xs bg-red-50 text-red-700 border border-red-200 px-2 py-1 rounded font-bold"><i class="fas fa-exclamation-circle"></i> Tarde</span>`;
                 }
-
                 tbody.innerHTML += `
                     <tr class="hover:bg-gray-50 transition border-l-4 border-purple-500">
-                        <td class="px-6 py-4 text-center font-black text-gray-700 text-lg bg-gray-50">${tarjeta.folio}</td>
-                        <td class="px-6 py-4">
-                            <div class="font-bold text-gray-800">${colab.nombre}</div>
-                            <div class="text-xs text-gray-500 font-semibold">No. ${colab.num}</div>
-                        </td>
-                        <td class="px-4 py-4 text-sm text-gray-600">${inicioStr}</td>
-                        <td class="px-4 py-4 text-sm font-bold text-gray-800">${devueltoStr}</td>
-                        <td class="px-4 py-4 text-center">${estadoHtml}</td>
-                    </tr>
-                `;
+                        <td class="px-6 py-4 text-center font-black text-gray-700 text-lg">${h.tObj.folio}</td>
+                        <td class="px-6 py-4"><div class="font-bold text-gray-800">${h.cObj.nombre}</div><div class="text-xs text-gray-500 font-semibold">No. ${h.cObj.num}</div></td>
+                        <td class="px-4 py-4 text-sm text-gray-600">${new Date(h.fecha_inicio).toLocaleString('es-MX', {dateStyle:'short',timeStyle:'short'})}</td>
+                        <td class="px-4 py-4 text-sm font-bold text-gray-800">${new Date(h.fecha_devolucion_real).toLocaleString('es-MX', {dateStyle:'short',timeStyle:'short'})}</td>
+                        <td class="px-4 py-4 text-center">${est}</td>
+                    </tr>`;
             });
         }
 
-        function actualizarInterfazGeneral() {
-            renderColaboradores();
-            renderTarjetas();
-            renderPrestamos();
-            renderHistorial();
-            actualizarDashboard();
-        }
+        function actualizarInterfazGeneral() { renderColaboradores(); renderTarjetas(); renderPrestamos(); renderHistorial(); actualizarDashboard(); }
+        function mostrarToast(msg, bg) { const t = document.getElementById('toast'); t.className = `fixed bottom-5 right-5 text-white px-6 py-3 rounded shadow-lg transition-opacity duration-300 z-50 ${bg}`; document.getElementById('toast-msg').innerText = msg; t.classList.remove('hidden', 'opacity-0'); setTimeout(() => { t.classList.add('opacity-0'); setTimeout(() => t.classList.add('hidden'), 300); }, 3000); }
 
-        function mostrarToast(msg, bg) {
-            const t = document.getElementById('toast');
-            t.className = `fixed bottom-5 right-5 text-white px-6 py-3 rounded shadow-lg transition-opacity duration-300 z-50 ${bg}`;
-            document.getElementById('toast-msg').innerText = msg;
-            t.classList.remove('hidden', 'opacity-0');
-            setTimeout(() => {
-                t.classList.add('opacity-0');
-                setTimeout(() => t.classList.add('hidden'), 300);
-            }, 3000);
-        }
-
-        // SE INICIA LA APP
         init();
     </script>
 </body>
