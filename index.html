@@ -457,8 +457,55 @@
 
     <!-- SCRIPT PRINCIPAL -->
     <script>
-        const URL_GOOGLE_SCRIPT = "https://script.google.com/a/macros/coppel.com/s/AKfycbyQibnCGK663j5e04Uvj-Ks77ko-X2OL56-7BL7gZY1nppbdEVZaH3J2clpAinD5mag/exec";
+        const URL_GOOGLE_SCRIPT = "https://carpool-coppel-default-rtdb.firebaseio.com/carpool.json";
         
+        let db = { colaboradores: [], tarjetas: [], prestamos: [], historial: [] };
+        
+        // ... (tus variables pendientes se quedan igual)
+
+        async function init() {
+            try {
+                // Descarga los datos desde Firebase
+                const response = await fetch(FIREBASE_URL);
+                if(response.ok) {
+                    const cloudData = await response.json();
+                    if(cloudData && cloudData.colaboradores) {
+                        db = cloudData;
+                        // Guarda copia de seguridad local
+                        localStorage.setItem('coppel_carpool_db', JSON.stringify(db));
+                    }
+                }
+            } catch (e) {
+                console.warn("No se pudo conectar a Firebase. Usando respaldo local.");
+                const dataGuardada = localStorage.getItem('coppel_carpool_db');
+                if (dataGuardada) db = JSON.parse(dataGuardada);
+            }
+            
+            // Validar que no falte nada
+            if(!db.colaboradores) db.colaboradores = []; 
+            if(!db.tarjetas) db.tarjetas = []; 
+            if(!db.prestamos) db.prestamos = []; 
+            if(!db.historial) db.historial = [];
+            
+            actualizarInterfazGeneral();
+            
+            // Ocultar pantalla de carga
+            const overlay = document.getElementById('loading-overlay');
+            if(overlay) { overlay.classList.add('opacity-0'); setTimeout(() => overlay.classList.add('hidden'), 500); }
+        }
+
+        function guardarData() {
+            // Guarda en la memoria de la PC para que la pantalla sea rápida
+            try { localStorage.setItem('coppel_carpool_db', JSON.stringify(db)); } catch (e) {}
+            actualizarInterfazGeneral();
+
+            // Sube la información a Firebase en segundo plano usando el método PUT
+            fetch(FIREBASE_URL, { 
+                method: 'PUT', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify(db) 
+            }).catch(err => console.error("Error guardando en Firebase:", err));
+        }
         let db = { colaboradores: [], tarjetas: [], prestamos: [], historial: [] };
         let idPrestamoPendiente = null, idTarjetaPendiente = null, idTarjetaEliminarPendiente = null, idColaboradorEliminarPendiente = null, idColaboradorParaFoto = null, indiceVehiculoParaFoto = 1, idColaboradorEdicion = null;
 
